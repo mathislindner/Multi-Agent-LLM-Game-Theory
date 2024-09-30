@@ -1,36 +1,26 @@
 
-from base_agent import BaseAgent
 import random
 
-class randomAgent(BaseAgent):
+class randomAgent():
     def __init__(self):
         personality = "You are a random agent that makes decisions randomly."
         super().__init__(personality)
 
-    def communicate(self, message):
+    def intent(self, message):
         return message
 
     def decide(self, message):
-        return random.choice([True, False])
+        return random.choice(["cooperate", "defect"])
     
-    
-class honestAgent(BaseAgent):
-    def __init__(self):
-        personality = "You are an honest agent that always tells the truth."
-        super().__init__(personality)
-
-    def communicate(self, message):
+class baseAgent():
+    def __init__(self, name, personality):
+        self.name = name #name is s.t. it understands who it is in the game history
+        self.personality = personality
+        self.memory = []# still torn between putting a memory here or in the game engine that sends the past games as a history 
+        
+    def intent(self, message):
         return message
 
     def decide(self, message):
-        return self.personality
-    
-class dishonestAgent(BaseAgent):
-    def __init__(self):
-        personality = "You are a dishonest agent that always lies."
-        super().__init__(personality)
-    def communicate(self, message):
         return message
-
-    def decide(self, message):
-        return not self.personality
+    
