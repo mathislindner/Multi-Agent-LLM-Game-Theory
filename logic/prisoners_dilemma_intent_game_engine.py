@@ -13,7 +13,22 @@ tool_node = ToolNode(agent_tools)
 
 model = TestModel(agent1, agent2, tool_node)
 
-history = []
+history = {}
+"""
+{
+    "Game nr": 1,
+    "agent1_intent": "cooperate",
+    "agent2_intent": "cooperate",
+    "agent1_decision": "cooperate",
+    "agent2_decision": "defect"
+    "payoffs": {
+        "agent1": 0,
+        "agent2": 3
+    },
+    Game nr: 2,
+    ...
+}
+"""
 def run_game(self):
     # Simulate thePrisonersDilemmaPayoff game, coordinating between agents
     agent1_intent = self.agent1.intent(history)
