@@ -1,8 +1,10 @@
-from logic.prisoners_dilemma_intent_game_engine import GameEngine
+from logic.prisoners_dilemma_intent_game_engine import run_game
 import argparse
 def main():
-    game = GameEngine()
-    game.run()
+    if args.run:
+        run_game()
+    else:
+        print("Please provide the --run flag to run the game")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
