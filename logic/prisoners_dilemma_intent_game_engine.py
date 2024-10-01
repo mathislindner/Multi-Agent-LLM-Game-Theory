@@ -36,7 +36,6 @@ def evaluate_outcome(agent1_decision, agent2_decision):
     }
     return payoff_matrix[(agent1_decision, agent2_decision)]
 
-# Function for handling the round transition
 def increment_round(state: MessagesState) -> Literal["agent1_comm", END]:
     """Increments the game round and determines whether the game should continue."""
     global current_round
@@ -44,6 +43,7 @@ def increment_round(state: MessagesState) -> Literal["agent1_comm", END]:
         return END
     current_round += 1
     return "agent1_comm"
+
 
 # LangGraph nodes and transitions
 def call_model(state: MessagesState):
@@ -57,27 +57,37 @@ workflow = StateGraph(MessagesState)
 
 # Define the sequence of states for communication and decision-making
 workflow.add_node("agent1_comm", tool_node)
-workflow.add_node("agent1_decision", tool_node)
 workflow.add_node("agent2_comm", tool_node)
+workflow.add_node("agent1_decision", tool_node)
 workflow.add_node("agent2_decision", tool_node)
+
+# Add the increment_round function as a node
+workflow.add_node("increment_round", increment_round)
 
 # Set the entry point for agent1 communication in the first round
 workflow.add_edge(START, "agent1_comm")
 
-# Agent1 communication -> decision
+# Set the entry point for agent2 communication in the first round
+workflow.add_edge(START, "agent2_comm")
+
+# Agent1 communication, Agent2 communication -> agent1_decision
 workflow.add_edge("agent1_comm", "agent1_decision")
+workflow.add_edge("agent2_comm", "agent1_decision")
 
-# Agent1 decision -> Agent2 communication
-workflow.add_edge("agent1_decision", "agent2_comm")
-
-# Agent2 communication -> decision
+# Agent1 communication, Agent2 communication -> agent2_decision
+workflow.add_edge("agent1_comm", "agent2_decision")
 workflow.add_edge("agent2_comm", "agent2_decision")
 
-# Agent2 decision -> End of round or new round
-workflow.add_conditional_edges("agent2_decision", increment_round)
+# Agent2 decision, Agent1 decision -> increment_round
+workflow.add_edge("agent1_decision", "increment_round")
+workflow.add_edge("agent2_decision", "increment_round")
 
 # Compile the workflow
 app = workflow.compile()
+
+#draw the langgraph
+print(app.get_graph().draw_mermaid())
+
 
 # Game Runner
 def run_game():
