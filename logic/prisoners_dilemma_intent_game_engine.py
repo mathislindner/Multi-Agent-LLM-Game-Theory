@@ -16,8 +16,8 @@ agent1 = baseAgent(name="agent 1", personality="You are an honest agent that alw
 agent2 = baseAgent(name="agent 2", personality="You are a dishonest agent that always lies.")
 
 # Tools for communication and decision
-agent_tools = [prisoners_dilemma_communication, prisoners_dilemma_decision]
-tool_node = ToolNode(agent_tools)
+communication_tool_node = ToolNode(prisoners_dilemma_communication)
+decision_tool_node = ToolNode(prisoners_dilemma_decision)
 
 # Define a TestModel to simulate agent behavior
 model = TestModel()
@@ -56,10 +56,10 @@ def call_model(state: MessagesState):
 workflow = StateGraph(MessagesState)
 
 # Define the sequence of states for communication and decision-making
-workflow.add_node("agent1_comm", tool_node)
-workflow.add_node("agent2_comm", tool_node)
-workflow.add_node("agent1_decision", tool_node)
-workflow.add_node("agent2_decision", tool_node)
+workflow.add_node("agent1_comm", communication_tool_node)
+workflow.add_node("agent2_comm", communication_tool_node)
+workflow.add_node("agent1_decision", decision_tool_node)
+workflow.add_node("agent2_decision", decision_tool_node)
 
 # Add the increment_round function as a node
 workflow.add_node("increment_round", increment_round)
@@ -70,11 +70,11 @@ workflow.add_edge(START, "agent1_comm")
 # Set the entry point for agent2 communication in the first round
 workflow.add_edge(START, "agent2_comm")
 
-# Agent1 communication, Agent2 communication -> agent1_decision
+# Agent1 communication, Agent2 communication -> agent1_decision #TODO somehow pass the communcations to the prompt s.t. the agent can add the decision to the state
 workflow.add_edge("agent1_comm", "agent1_decision")
 workflow.add_edge("agent2_comm", "agent1_decision")
 
-# Agent1 communication, Agent2 communication -> agent2_decision
+# Agent1 communication, Agent2 communication -> agent2_decision #TODO somehow pass the communcations to the prompt s.t. the agent can add the decision to the state
 workflow.add_edge("agent1_comm", "agent2_decision")
 workflow.add_edge("agent2_comm", "agent2_decision")
 
