@@ -1,3 +1,5 @@
 .venv/
 game_histories/
 */__pycache__/*
+.env
+data/*

@@ -1,4 +1,8 @@
 langchain
 langgraph
-transformers
 torch
+transformers
+python-dotenv
+accelerate>=0.26.0
+bitsandbytes
+setuptools
