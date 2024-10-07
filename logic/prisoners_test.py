@@ -1,21 +1,42 @@
 from models.test_model import TestModel
+from huggingface_models import get_huggingface_pipeline
+from transformers import pipeline
 from data.prompts.prisoners_dilemma_prompts import *
+import dotenv
+dotenv.load_dotenv()
 
 class baseAgent():
     name : str = "None"
-    prompt : str = ""
+    prompt : list = []
 
     def __init__(self, name, prompt):
         self.name = name
         self.append_prompt(prompt)
 
     def append_prompt(self, message):
-        self.prompt += message
+        self.prompt.append(message)
+
+    def remove_prompt(self):
+        self.prompt.pop()
         
 def launch_game():
     game_state = {}
 
-    llm = TestModel()
+    # model exists load it else create it
+    if os.path.exists("data/models/llama1b/"):
+        llm = pipeline(
+            "text-generation",
+            model="data/models/llama1b",
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+            token=HUGGINFACE_TOKEN,
+        )
+    else:
+        #llm = TestModel()
+        MODEL_ID = os.getenv("MODEL_ID")
+        pipe = get_huggingface_pipeline(MODEL_ID)
+        #save_pipeline
+        pipe.save_pretrained("data/models/llama1b/")
 
     agent1 = baseAgent("agent1", game_prompt)
     agent2 = baseAgent("agent2", game_prompt)
@@ -23,20 +44,34 @@ def launch_game():
     agent1.append_prompt(agent_1_prompt)
     agent2.append_prompt(agent_2_prompt)
 
-    agent1.append_prompt(altruist_agent_prompt)
-    agent2.append_prompt(selfish_agent_prompt)
+    agent1.append_prompt(call_for_message + "\n agent 1: ")
+    agent2.append_prompt(call_for_message + "\n agent 2: ")
 
-    agent1.append_prompt(call_for_message + "\n agent 1 (you): ")
-    agent2.append_prompt(call_for_message + "\n agent 2 (you): ")
+    agent1_message = pipe(
+        agent1.prompt,
+        max_new_tokens=5,
+    )[0]["generated_text"][-1]
 
-    agent1_message = llm.invoke(agent1.prompt)
-    agent2_message = llm.invoke(agent2.prompt)
+    agent2_message = pipe(
+        agent2.prompt,
+        max_new_tokens=5,
+    )[0]["generated_text"][-1]
+    #TODO add to game state
+    game_state["agent1_message"] = agent1_message
+    game_state["agent2_message"] = agent2_message
 
     def add_prompts_from_messages(agent1_message, agent2_message):
-        reply_agent_1 = agent1_message.split("you): ")[-1]
-        reply_agent_2 = agent2_message.split("you): ")[-1]
-        agent1.append_prompt(reply_agent_2 + call_for_decision +"\n agent 1 (you): ")
-        agent2.append_prompt(reply_agent_1 + call_for_decision +"\n agent 2 (you): ")
+        #TODO
+        reply_agent_1 = {"role":"agent1", "content": agent1_message}
+        reply_agent_2 = {"role":"agent2", "content": agent2_message}
+        agent_1_history = {contentagent1.remove_prompt() + reply_agent_1}
+        agent_2_history = {contentagent2.remove_prompt() + reply_agent_2}
+        agent1.append_prompt(reply_agent_2)
+        agent1.append_prompt(reply_agent_1)
+        agent2.append_prompt(reply_agent_1)
+        agent2.append_prompt(reply_agent_2)
+        agent1.append_prompt(call_for_decision)
+        agent2.append_prompt(call_for_decision)
 
     add_prompts_from_messages(agent1_message, agent2_message)
 
