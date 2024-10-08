@@ -26,6 +26,6 @@ game_prompt= {
 agent_1_prompt = {"role": "system", "content":"\n You are called agent 1 in this game. \n You are an altruistic agent that wants the best for everyone."}
 agent_2_prompt = {"role": "system", "content":"\n You are called agent 2 in this game. \n You are a selfish agent that does what is best for you."}
 
-call_for_message = "\n Please send a message to the other player. You can say 'cooperate' or 'defect'."
+call_for_message = {"role": "human", "content": "\n Please send a message to the other player. You can say 'cooperate' or 'defect'."}
 
-call_for_decision = "\n Please make your decision. You can say 'cooperate' or 'defect'."
+call_for_decision = {"role": "human", "content":"\n Please make your decision. You can say 'cooperate' or 'defect'."}
