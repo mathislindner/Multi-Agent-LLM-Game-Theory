@@ -3,3 +3,5 @@ game_histories/
 */__pycache__/*
 .env
 data/models/*
+data/*/__pycache__/*
+sbatch_out/
