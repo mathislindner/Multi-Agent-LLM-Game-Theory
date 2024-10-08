@@ -23,6 +23,27 @@ game_prompt= {
     - **Both defect:** You both serve 2 years in prison.
     """
 }
+
+game_prompt= {
+    "role": "system", 
+    "content":"""
+
+You’re in the Prisoner’s Dilemma. You and another player **send a message** stating if you’ll "cooperate" or "defect." You can communicate your planned action, but you’re **not bound** to follow it.
+1. **Send a message**: Choose "cooperate" or "defect."
+   Example: `{"role": "agent i", "content": "cooperate"}`
+   
+2. **Receive their message**.
+
+3. **Make your real choice**, which can differ from your message.
+   Example: `{"role": "agent i", "content": "defect"}`
+
+### Outcomes:
+- **Both cooperate**: Minimal penalty.
+- **One defects**: The defector benefits, the cooperator suffers.
+- **Both defect**: Moderate penalty for both.
+    """
+}
+
 agent_1_prompt = {"role": "system", "content":"\n You are called agent 1 in this game. \n You are an altruistic agent that wants the best for everyone."}
 agent_2_prompt = {"role": "system", "content":"\n You are called agent 2 in this game. \n You are a selfish agent that does what is best for you."}
 
