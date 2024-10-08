@@ -14,9 +14,9 @@ def get_huggingface_pipeline(model_id):
         "text-generation",
         model=model_id,
         torch_dtype=torch.bfloat16,
-        device_map="auto",
         token=HUGGINFACE_TOKEN,
     )
+
 def try_huggingface_model():
     pipe = get_huggingface_pipeline(MODEL_ID)
     messages = [

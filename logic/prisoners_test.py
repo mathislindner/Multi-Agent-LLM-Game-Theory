@@ -1,4 +1,4 @@
-from models.test_model import TestModel
+#from models.test_model import TestModel
 from models.huggingface_models import get_huggingface_pipeline
 import torch
 from transformers import pipeline
@@ -27,13 +27,7 @@ def launch_game():
 
     # model exists load it else create it
     if os.path.exists("data/models/llama1b/"):
-        pipe = pipeline(
-            "text-generation",
-            model="data/models/llama1b",
-            torch_dtype=torch.bfloat16,
-            device_map="auto",
-            token=HUGGINFACE_TOKEN,
-        )
+        pipe = get_huggingface_pipeline("data/models/llama1b/")
 
     else:
         #llm = TestModel()
