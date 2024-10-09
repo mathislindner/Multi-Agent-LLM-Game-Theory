@@ -1,5 +1,6 @@
 #from logic.prisoners_dilemma_intent_game_engine import run_game
 from logic.prisoners_test import launch_game
+#from logic.prisoners_test_parallel import launch_game
 #from models.huggingface_models import try_huggingface_model
 import argparse
 def main(model_id):
