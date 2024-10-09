@@ -2,17 +2,12 @@
 from logic.prisoners_test import launch_game
 #from models.huggingface_models import try_huggingface_model
 import argparse
-def main():
-    if args.run:
-        #run_game()
-        launch_game()
-        #try_huggingface_model()
-    else:
-        print("Please provide the --run flag to run the game")
+def main(model_id):
+    launch_game(model_id)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", help="Run the game", action="store_true")
+    parser.add_argument("--model_id", type=str, help="The model id to use for the game", required=True)
     args = parser.parse_args()
-    main()
+    main(model_id=args.model_id)
 

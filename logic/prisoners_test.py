@@ -1,12 +1,7 @@
 #from models.test_model import TestModel
 from models.huggingface_models import get_huggingface_pipeline
-import torch
-from transformers import pipeline
 from data.prompts.prisoners_dilemma_prompts import *
-import dotenv
 import os
-dotenv.load_dotenv()
-HUGGINFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 class baseAgent():
     name : str = "None"
@@ -22,19 +17,11 @@ class baseAgent():
     def remove_prompt(self):
         self.prompt.pop()
         
-def launch_game():
+def launch_game(MODEL_ID):
     game_state = {}
 
-    # model exists load it else create it
-    if os.path.exists("data/models/llama1b/"):
-        pipe = get_huggingface_pipeline("data/models/llama1b/")
-
-    else:
-        #llm = TestModel()
-        MODEL_ID = os.getenv("MODEL_ID")
-        pipe = get_huggingface_pipeline(MODEL_ID)
-        #save_pipeline
-        pipe.save_pretrained("data/models/llama1b/")
+    pipe = get_huggingface_pipeline(MODEL_ID)
+    #processor = AutoProcessor.from_pretrained(model_id)
 
     agent1 = baseAgent("agent1", game_prompt)
     agent2 = baseAgent("agent2", game_prompt)
@@ -45,15 +32,18 @@ def launch_game():
     agent1.append_prompt(call_for_message)
     agent2.append_prompt(call_for_message)
 
+    print("Game started")
+
     agent1_message = pipe(
         agent1.prompt,
-        max_new_tokens=5,
+        max_new_tokens=12,
     )[0]["generated_text"][-1]
+    
     print(f"Agent 1 sent the message: {agent1_message}")
 
     agent2_message = pipe(
-        agent2.prompt,
-        max_new_tokens=5,
+        text_inputs = agent2.prompt,
+        max_new_tokens = 5,
     )[0]["generated_text"][-1]
     print(f"Agent 2 sent the message: {agent2_message}")
 

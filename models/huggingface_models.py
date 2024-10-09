@@ -5,17 +5,23 @@ import dotenv
 
 dotenv.load_dotenv()
 
-HUGGINFACE_TOKEN = os.getenv("HUGGINFACE_TOKEN")
-MODEL_ID = os.getenv("MODEL_ID")
-#right now model not saved locally
-
-def get_huggingface_pipeline(model_id):
-    return pipeline(
-        "text-generation",
-        model=model_id,
-        torch_dtype=torch.bfloat16,
-        token=HUGGINFACE_TOKEN,
-    )
+def get_huggingface_pipeline(MODEL_ID):
+    HUGGINFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+    # if gpu available use it
+    device = 0 if torch.cuda.is_available() else -1
+    print("loading model on device: ", device)
+    if os.path.exists("/cluster/scratch/mlindner/master_thesis/data/models/{}/".format(MODEL_ID)):
+        pipe = pipeline("text-generation", model="/cluster/scratch/mlindner/master_thesis/data/models/{}/".format(MODEL_ID), torch_dtype=torch.bfloat16, device=device, token=HUGGINFACE_TOKEN)
+    else:
+        pipe = pipeline(
+            "text-generation", 
+            model=MODEL_ID, 
+            torch_dtype=torch.bfloat16,
+            device=device,
+            token=HUGGINFACE_TOKEN,
+        )
+        pipe.save_pretrained("/cluster/scratch/mlindner/master_thesis/data/models/{}/".format(MODEL_ID))
+    return pipe
 
 def try_huggingface_model():
     pipe = get_huggingface_pipeline(MODEL_ID)
