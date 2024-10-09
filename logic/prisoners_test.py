@@ -36,14 +36,14 @@ def launch_game(MODEL_ID):
 
     agent1_message = pipe(
         agent1.prompt,
-        max_new_tokens=12,
+        max_new_tokens=20,
     )[0]["generated_text"][-1]
     
     print(f"Agent 1 sent the message: {agent1_message}")
 
     agent2_message = pipe(
         text_inputs = agent2.prompt,
-        max_new_tokens = 5,
+        max_new_tokens = 20,
     )[0]["generated_text"][-1]
     print(f"Agent 2 sent the message: {agent2_message}")
 
