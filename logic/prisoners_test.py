@@ -2,6 +2,7 @@
 from models.huggingface_models import get_huggingface_pipeline
 from data.prompts.prisoners_dilemma_prompts import *
 import os
+import json
 
 class baseAgent():
     name : str = "None"
@@ -16,15 +17,12 @@ class baseAgent():
 
     def remove_prompt(self):
         return self.prompt.pop()
-        
+
 def launch_game(MODEL_ID):
     game_state = {}
-
-    pipe = get_huggingface_pipeline(MODEL_ID)
-    #processor = AutoProcessor.from_pretrained(model_id)
-
-    agent1 = baseAgent("agent1", game_prompt)
-    agent2 = baseAgent("agent2", game_prompt)
+    
+    agent1 = baseAgent("agent 1", game_prompt_1)
+    agent2 = baseAgent("agent 2", game_prompt_2)
 
     agent1.append_prompt(agent_1_prompt)
     agent2.append_prompt(agent_2_prompt)
@@ -33,19 +31,22 @@ def launch_game(MODEL_ID):
     agent2.append_prompt(call_for_message)
 
     print("Game started")
-
+    pipe = get_huggingface_pipeline(MODEL_ID)
     agent1_message = pipe(
         agent1.prompt,
         max_new_tokens=20,
     )[0]["generated_text"][-1]
-    
-    print(f"Agent 1 sent the message: {agent1_message}")
+
+    agent1_message = json.loads(agent1_message['content'])    
+    print(agent1_message)
 
     agent2_message = pipe(
         text_inputs = agent2.prompt,
         max_new_tokens = 20,
     )[0]["generated_text"][-1]
-    print(f"Agent 2 sent the message: {agent2_message}")
+
+    agent2_message = json.loads(agent2_message['content'])
+    print(agent2_message)
 
     #TODO add to game state
     game_state["agent1_message"] = agent1_message
@@ -53,21 +54,22 @@ def launch_game(MODEL_ID):
 
     def add_prompts_from_messages(agent1_message, agent2_message):
         #TODO
-        reply_agent_1 = {"role":"agent 1", "content": agent1_message}
-        reply_agent_2 = {"role":"agent 2", "content": agent2_message}
-        agent_1_history = {agent1.remove_prompt() + reply_agent_1}
-        agent_2_history = {agent2.remove_prompt() + reply_agent_2}
-        agent1.append_prompt(reply_agent_2)
-        agent1.append_prompt(reply_agent_1)
-        agent2.append_prompt(reply_agent_1)
-        agent2.append_prompt(reply_agent_2)
+        _ = agent1.remove_prompt()
+        _ = agent2.remove_prompt()
+
+        agent1.append_prompt(agent1_message)
+        agent1.append_prompt(agent2_message)
+        agent2.append_prompt(agent2_message)
+        agent2.append_prompt(agent1_message)
+
         agent1.append_prompt(call_for_decision)
         agent2.append_prompt(call_for_decision)
 
     add_prompts_from_messages(agent1_message, agent2_message)
 
-    #agent1_decision = llm.invoke(agent1.prompt).split("you): ")[-1]
-    #agent2_decision = llm.invoke(agent2.prompt).split("you): ")[-1]
+    #print prompts
+    print(agent1.prompt)
+    print(agent2.prompt)
 
     agent1_decision = pipe(
         agent1.prompt,
