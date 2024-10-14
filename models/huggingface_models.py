@@ -7,6 +7,7 @@ dotenv.load_dotenv()
 
 def get_huggingface_pipeline(MODEL_ID):
     HUGGINFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+    os.environ["HF_HOME"] = "/cluster/scratch/mlindner/cache/"
     # if gpu available use it
     device = 0 if torch.cuda.is_available() else -1
     print("loading model on device: ", device)
@@ -19,6 +20,8 @@ def get_huggingface_pipeline(MODEL_ID):
             torch_dtype=torch.bfloat16,
             device=device,
             token=HUGGINFACE_TOKEN,
+            use_cache=False,
+            load_in_4bit=True
         )
         pipe.save_pretrained("/cluster/scratch/mlindner/master_thesis/data/models/{}/".format(MODEL_ID))
     return pipe
