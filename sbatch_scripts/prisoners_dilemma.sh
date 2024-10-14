@@ -18,4 +18,4 @@ nvidia-smi
 echo "Running prisoners dilemma\n"
 
 export HF_HOME=/cluster/scratch/mlindner/cache/
-python main.py --model_id fsaudm/Meta-Llama-3.1-70B-Instruct-NF4
+python main.py --model_id meta-llama/Llama-3.1-8B-Instruct

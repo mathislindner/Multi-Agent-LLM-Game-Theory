@@ -18,9 +18,9 @@ class baseAgent():
 def parse_for_decision(generted_dict):
     content = generted_dict["content"]
     #look for COOPERATE or DEFECT
-    if "COOPERATE" in content:
+    if "cooperate" in content:
         return "COOPERATE"
-    elif "DEFECT" in content:
+    elif "defect" in content:
         return "DEFECT"
 
 def generate(prompt, pipe):
@@ -74,7 +74,7 @@ def launch_game(MODEL_ID):
     agent2_message = generate(agent2.prompt, pipe)
 
     #add messages from agents to prompts
-    agent1, agent2 = add_prompts_from_messages(agent1_message, agent2_message)
+    agent1, agent2 = add_prompts_from_messages(agent1, agent2, agent1_message, agent2_message)
     #let the agents decide
     agent1_decision = generate(agent1.prompt, pipe)
     agent2_decision = generate(agent2.prompt, pipe)
@@ -89,8 +89,8 @@ def launch_game(MODEL_ID):
         return payoff_matrix[(agent1_decision, agent2_decision)]
 
     #parse decisions for COOPERATE or DEFECT
-    agent1_decision = parse_for_decision(agent1_decision)
-    agent2_decision = parse_for_decision(agent2_decision)
+    agent1_decision_outcome = parse_for_decision(agent1_decision)
+    agent2_decision_outcome = parse_for_decision(agent2_decision)
 
     print(json.dumps(agent1.prompt, indent=4))
     print(json.dumps(agent2.prompt, indent=4))
@@ -99,6 +99,6 @@ def launch_game(MODEL_ID):
     print(agent1_decision["content"])
     print(agent2_decision["content"])
     
-    outcome = evaluate_outcome(agent1_decision, agent2_decision)
+    outcome = evaluate_outcome(agent1_decision_outcome, agent2_decision_outcome)
     print(f"Outcome: {outcome}")
 
