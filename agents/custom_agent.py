@@ -5,8 +5,9 @@ class baseAgent():
         self.prompt = [prompt]
 
     def append_prompt(self, message):
-        self.prompt.append(message)
-
+        if message!=None:
+            self.prompt.append(message)
+        
     def remove_prompt(self):
         return self.prompt.pop()
 

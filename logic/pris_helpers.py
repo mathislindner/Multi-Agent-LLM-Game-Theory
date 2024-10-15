@@ -18,6 +18,14 @@ def decision_message(decision, role):
         'content': f'\n{role}: {decision}'
     }
 
+def get_persona_prompt_from_persona(persona):
+    if persona == "selfish":
+        return {'role': 'system', 'content':' As the Assistant you are an altruistic assistant that wants the best for everyone.'}
+    if persona == "altruistic":
+        return {'role': 'system', 'content':'As the Assisant you are a selfish user that wants to maximize your own benefit.'}
+    if persona == "no_persona":
+        return None
+    
 def get_round_state_from_decisions(agent1_decision, agent2_decision, round_number = 0):
     payoff_matrix = {
         ("cooperate", "cooperate"): (2, 2),

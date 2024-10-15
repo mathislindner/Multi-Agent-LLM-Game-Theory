@@ -1,21 +1,23 @@
 #from models.test_model import TestModel
 from models.huggingface_models import get_huggingface_pipeline
 from models.test_model import TestModel
-from data.prompts.prisoners_dilemma_prompts_with_history import game_prompt, selfish_prompt, altruistic_prompt, call_for_message, call_for_decision, game_start, reminder
-from logic.pris_helpers import parse_for_decision, generate, decision_message, get_round_state_from_decisions, new_round_prompt, add_histories_to_prompts
+from data.prompts.prisoners_dilemma_prompts_with_history import game_prompt, call_for_message, call_for_decision, game_start, reminder
+from logic.pris_helpers import parse_for_decision, generate, get_round_state_from_decisions, new_round_prompt, add_histories_to_prompts, get_persona_prompt_from_persona
 from agents.custom_agent import baseAgent
 import json
 
-def play_n_rounds(n, model_id):
+def play_n_rounds(n, model_id, agent_1_persona, agent_2_persona):
     game_state = {}
+    
     agent1 = baseAgent("agent 1", game_prompt)
     agent2 = baseAgent("agent 2", game_prompt)
 
-    agent1.append_prompt(selfish_prompt)
-    agent2.append_prompt(selfish_prompt)
+    agent1.append_prompt(get_persona_prompt_from_persona(agent_1_persona))
+    agent2.append_prompt(get_persona_prompt_from_persona(agent_2_persona))
 
     agent1.append_prompt(game_start)
     agent2.append_prompt(game_start)
+    
     if model_id == "test":
         pipe = TestModel()
     else:
