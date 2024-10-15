@@ -2,7 +2,7 @@
 from models.huggingface_models import get_huggingface_pipeline
 from data.prompts.prisoners_dilemma_prompts import game_prompt, assistant_1_prompt, assistant_2_prompt, call_for_message, call_for_decision
 from agents.custom_agent import baseAgent
-from logic.pris_helpers import parse_for_decision, generate, decision_message, add_prompts_from_messages, evaluate_outcome
+from logic.pris_helpers import parse_for_decision, generate, decision_message, get_round_state_from_decisions, add_histories_to_prompts
 import os
 import json
 
@@ -25,7 +25,9 @@ def launch_game(MODEL_ID):
     agent2_message = generate(agent2.prompt, pipe)
 
     #add messages from agents to prompts
-    agent1, agent2 = add_prompts_from_messages(agent1, agent2, agent1_message, agent2_message, call_for_decision)
+    agent1, agent2 = add_histories_to_prompts(agent1, agent2, agent1_message, agent2_message)
+    agent1.append_prompt(call_for_decision)
+    agent2.append_prompt(call_for_decision)
     #let the agents decide
     agent1_decision = generate(agent1.prompt, pipe)
     agent2_decision = generate(agent2.prompt, pipe)
@@ -41,6 +43,6 @@ def launch_game(MODEL_ID):
     print(agent1_decision["content"])
     print(agent2_decision["content"])
     
-    outcome = evaluate_outcome(agent1_decision_outcome, agent2_decision_outcome)
+    outcome = get_round_state_from_decisions(agent1_decision_outcome, agent2_decision_outcome)
     print(f"Outcome: {outcome}")
 

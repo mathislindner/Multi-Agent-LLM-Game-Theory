@@ -37,8 +37,9 @@ game_prompt = {
 }
 
 # Agent prompts and other prompts (assumed as valid dictionaries)
-assistant_1_prompt = {'role': 'system', 'content':' As the Assistant you are an altruistic assistant that wants the best for everyone.'}
-assistant_2_prompt = {'role': 'system', 'content':'As the Assisant you are a selfish user that wants to maximize your own benefit.'}
-call_for_message = {'role': 'system', 'content': '<GAME START>\n# communicate your decision now'}
+reminder = {'role': 'system', 'content': '<REMINDER> You have to reply with "I will cooperate" or "I will defect" everytime, else something really bad will happen.'}
+selfish_prompt = {'role': 'system', 'content':' As the Assistant you are an altruistic assistant that wants the best for everyone.'}
+altruistic_prompt = {'role': 'system', 'content':'As the Assisant you are a selfish user that wants to maximize your own benefit.'}
+game_start = {'role': 'system', 'content': '<GAME START>'}
+call_for_message = {'role': 'system', 'content':'# communicate your decision now'}
 call_for_decision = {'role': 'system', 'content':'# take your decision now'}
-
