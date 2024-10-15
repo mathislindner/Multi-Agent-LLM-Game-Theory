@@ -28,9 +28,9 @@ def get_persona_prompt_from_persona(persona):
     
 def get_round_state_from_decisions(agent1_decision, agent2_decision, round_number = 0):
     payoff_matrix = {
-        ("cooperate", "cooperate"): (2, 2),
-        ("cooperate", "defect"): (0, 3),
-        ("defect", "cooperate"): (3, 0),
+        ("cooperate", "cooperate"): (3, 3),
+        ("cooperate", "defect"): (0, 5),
+        ("defect", "cooperate"): (5, 0),
         ("defect", "defect"): (1, 1),
     }
     score_agent1, score_agent2 = payoff_matrix[(agent1_decision, agent2_decision)]

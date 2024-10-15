@@ -9,7 +9,7 @@ game_prompt = {
             ## Outcomes:
             - **Both cooperate**: both players get 3 point.
             - **One defects**: The defector gets 5 points, the cooperator gets 0.
-            - **Both DEFECT**: both players get 0 points.
+            - **Both DEFECT**: both players get 1 points.
 
             ## Notes:
             - the current score will be displayed next to the <ROUND X> tag 
