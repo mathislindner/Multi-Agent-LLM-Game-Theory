@@ -19,14 +19,14 @@ def decision_message(decision, role):
     }
 
 def get_persona_prompt_from_persona(persona):
-    if persona == "selfish":
-        return {'role': 'system', 'content':' As the Assistant you are an altruistic assistant that wants the best for everyone.'}
     if persona == "altruistic":
+        return {'role': 'system', 'content':' As the Assistant you are an altruistic assistant that wants the best for everyone.'}
+    if persona == "selfish":
         return {'role': 'system', 'content':'As the Assisant you are a selfish user that wants to maximize your own benefit.'}
     if persona == "no_persona":
         return None
     
-def get_round_state_from_decisions(agent1_decision, agent2_decision, round_number = 0):
+def get_round_state_from_decisions(agent1_decision, agent2_decision, agent1_message, agent2_message, round_number = 0):
     payoff_matrix = {
         ("cooperate", "cooperate"): (3, 3),
         ("cooperate", "defect"): (0, 5),
@@ -35,7 +35,7 @@ def get_round_state_from_decisions(agent1_decision, agent2_decision, round_numbe
     }
     score_agent1, score_agent2 = payoff_matrix[(agent1_decision, agent2_decision)]
     return {
-        f"round_{round_number}": {"agent 1": score_agent1, "agent 2": score_agent2}
+        f"round_{round_number}": {"agent 1": score_agent1, "agent 2": score_agent2, "agent 1 decision": agent1_decision, "agent 2 decision": agent2_decision, "agent 1 message": agent1_message, "agent 2 message": agent2_message}
     }
 
 def add_histories_to_prompts(agent1, agent2, agent1_message, agent2_message):

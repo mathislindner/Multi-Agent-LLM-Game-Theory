@@ -71,7 +71,7 @@ def play_n_rounds(n, model_id, agent_1_persona, agent_2_persona):
         if agent2_decision_outcome == None:
             raise ValueError("Agent 2 decision not valid: {}".format(agent2_decision))
 
-        round_state = get_round_state_from_decisions(agent1_decision_outcome, agent2_decision_outcome, i)
+        round_state = get_round_state_from_decisions(agent1_decision_outcome, agent2_decision_outcome, agent1_message, agent2_message, i)
         print(f"Outcome: {round_state}")
         game_state.update(round_state)
 
