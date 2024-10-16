@@ -5,4 +5,3 @@ game_histories/
 data/models/*
 data/*/__pycache__/*
 sbatch_out/
-outputs/

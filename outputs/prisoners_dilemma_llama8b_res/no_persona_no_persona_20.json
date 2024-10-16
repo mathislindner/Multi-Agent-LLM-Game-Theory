@@ -1,0 +1,282 @@
+{
+    "round_0": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "I will cooperate"
+        }
+    },
+    "round_1": {
+        "agent 1": 1,
+        "agent 2": 1,
+        "agent 1 decision": "defect",
+        "agent 2 decision": "defect",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will defect"
+        }
+    },
+    "round_2": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_3": {
+        "agent 1": 5,
+        "agent 2": 0,
+        "agent 1 decision": "defect",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_4": {
+        "agent 1": 5,
+        "agent 2": 0,
+        "agent 1 decision": "defect",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_5": {
+        "agent 1": 1,
+        "agent 2": 1,
+        "agent 1 decision": "defect",
+        "agent 2 decision": "defect",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will defect"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_6": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_7": {
+        "agent 1": 1,
+        "agent 2": 1,
+        "agent 1 decision": "defect",
+        "agent 2 decision": "defect",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will defect"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_8": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_9": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_10": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_11": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_12": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_13": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_14": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_15": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_16": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_17": {
+        "agent 1": 0,
+        "agent 2": 5,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "defect",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_18": {
+        "agent 1": 5,
+        "agent 2": 0,
+        "agent 1 decision": "defect",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    },
+    "round_19": {
+        "agent 1": 3,
+        "agent 2": 3,
+        "agent 1 decision": "cooperate",
+        "agent 2 decision": "cooperate",
+        "agent 1 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        },
+        "agent 2 message": {
+            "role": "assistant",
+            "content": "assistant: I will cooperate"
+        }
+    }
+}
