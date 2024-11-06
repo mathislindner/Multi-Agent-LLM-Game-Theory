@@ -21,7 +21,7 @@ def get_huggingface_pipeline(MODEL_ID):
             device=device,
             token=HUGGINFACE_TOKEN,
             use_cache=False,
-            load_in_4bit=True
+            #load_in_4bit=True
         )
         pipe.save_pretrained("/cluster/scratch/mlindner/master_thesis/data/models/{}/".format(MODEL_ID))
     return pipe
