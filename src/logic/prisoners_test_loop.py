@@ -1,5 +1,5 @@
 #from models.test_model import TestModel
-from models.huggingface_models import get_huggingface_pipeline
+from models import get_model
 from models.test_model import TestModel
 from data.prompts.prisoners_dilemma_prompts_with_history import game_prompt, call_for_message, call_for_decision, game_start, reminder
 from logic.pris_helpers import parse_for_decision, generate, get_round_state_from_decisions, new_round_prompt, add_histories_to_prompts, get_persona_prompt_from_persona
@@ -21,7 +21,7 @@ def play_n_rounds(n, model_id, agent_1_persona, agent_2_persona):
     if model_id == "test":
         pipe = TestModel()
     else:
-        pipe = get_huggingface_pipeline(model_id)
+        pipe = get_model(model_id)
 
     for i in range(n):
         #new round
