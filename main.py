@@ -6,7 +6,7 @@ import json
 
 def main(model_id, rounds, agent_1_persona, agent_2_persona):
     #out_file_name = f"outputs/{agent_1_persona}_{agent_2_persona}_{rounds}"
-    game_state = run_n_rounds_w_com(model_name = model_id, rounds = rounds, personality_key_1 = agent_1_persona, personality_key_2 = agent_2_persona)
+    game_state = run_n_rounds_w_com(model_name = model_id, total_rounds = rounds, personality_key_1 = agent_1_persona, personality_key_2 = agent_2_persona)
     print(game_state)
 
 if __name__ == "__main__":

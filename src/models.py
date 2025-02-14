@@ -4,7 +4,7 @@ import os
 
 load_dotenv()
 #--------------------------------------------------------
-def get_model(model_name: str, max_new_tokens: int):
+def get_model(model_name: str):
     #if name starts with gpt..
     if model_name.startswith("gpt"):
         from langchain_openai import ChatOpenAI
