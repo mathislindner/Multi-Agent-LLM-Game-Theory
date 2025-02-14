@@ -41,8 +41,23 @@ def get_personality_from_key_prompt(personality_key:str) -> str:
     personalities = json.load(open("src/data/prompts/mbti_prompts_250129.json"))
     return SystemMessage(personalities[personality_key])
                 
-def get_game_history_prompt(agent_1_messages, agent_1_actions, agent_2_messages, agent_2_actions):
-    return SystemMessage(f"Agent 1 messages: {agent_1_messages}\nAgent 1 actions: {agent_1_actions}\nAgent 2 messages: {agent_2_messages}\nAgent 2 actions: {agent_2_actions}")                
+def get_game_history_prompt(current_agent, agent_1_messages, agent_1_actions, agent_2_messages, agent_2_actions, current_round):
+    game_history = "<GAME HISTORY>\n"
+    for round_num in range(1, current_round + 1):
+        game_history += f"""
+        <ROUND {round_num}>
+            <AGENT 1>
+            <MESSAGES>{agent_1_messages[round_num - 1]}</MESSAGES>
+            <ACTIONS>{agent_1_actions[round_num - 1]}</ACTIONS>
+            </AGENT 1>
+            <AGENT 2>
+            <MESSAGES>{agent_2_messages[round_num - 1]}</MESSAGES>
+            <ACTIONS>{agent_2_actions[round_num - 1]}</ACTIONS>
+            </AGENT 2>
+        </ROUND>
+        """
+    game_history += "</GAME HISTORY>"
+    return SystemMessage(game_history)
 # Agent prompts and other prompts (assumed as valid dictionaries)
 reminder = {'role': 'system', 'content': '<REMINDER> You have to reply with "I will cooperate" or "I will defect" everytime, else something really bad will happen.'}
 game_start = {'role': 'system', 'content': '<GAME START>'}

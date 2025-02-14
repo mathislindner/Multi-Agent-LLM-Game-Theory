@@ -45,7 +45,7 @@ def call_model_action_node(model, agent_name:str):
             personality_prompt = get_personality_from_key_prompt(state["personality_key_1"])
         else:
             personality_prompt = get_personality_from_key_prompt(state["personality_key_2"])
-        game_history = get_game_history_prompt(state["agent_1_messages"], state["agent_1_actions"], state["agent_2_messages"], state["agent_2_actions"], state["current_round"])
+        game_history = get_game_history_prompt(agent_name, state["agent_1_messages"], state["agent_1_actions"], state["agent_2_messages"], state["agent_2_actions"], state["current_round"])
         #call_for_action = {'role': 'system', 'content':'write your action now: '}
         action_prompt = state["game_description_prompt"] + personality_prompt + game_history
         response = model.with_structured_output(ActionResponse).invoke(action_prompt)
@@ -81,10 +81,8 @@ def should_continue(state: PDState) -> bool:
 def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str) -> None:
     # get models
     model = get_model(model_name)
-    #init graph
-    game_description_prompt = "" #get from data.prompts #say how many total rounds will be played
-    graph = StateGraph(PDState) #add state definition
-    initial_state = PDState(game_description_prompt = game_description_prompt, personality_key_1 = personality_key_1, personality_key_2 = personality_key_2, total_rounds = total_rounds)
+    #create graph
+    graph = StateGraph(PDState)
     #add nodes
     graph.add_node(f"distribute", lambda x: x)
     graph.add_node(f"message_agent_1", call_model_message_node(model, "agent_1"))
@@ -93,6 +91,7 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     graph.add_node(f"action_agent_2", call_model_action_node(model, "agent_2"))
     graph.add_node(f"gather", lambda x: x)
     graph.add_node(f"increment", increment_round)
+    
     #add edges
     graph.add_edge(START, "distribute")
     graph.add_edge("distribute", "message_agent_1")
@@ -112,11 +111,12 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
             True : "distribute"
             }
         )
-    
     #compile and run
     compiled_graph = graph.compile()
     #print mermaid
     print(compiled_graph.get_graph().draw_mermaid())
-    compiled_graph.invoke({"game_description_prompt":game_description_prompt, "personality_key_1":personality_key_1, "personality_key_2":personality_key_2, "current_round" : 1, "total_rounds" : total_rounds})
-    end_state = None
+    #create initial state
+    game_description_prompt = "" #get from data.prompts #say how many total rounds will be played
+    initial_state = {"game_description_prompt":game_description_prompt, "personality_key_1":personality_key_1, "personality_key_2":personality_key_2, "current_round" : 1, "total_rounds" : total_rounds}
+    end_state = compiled_graph.invoke(initial_state)
     return end_state
