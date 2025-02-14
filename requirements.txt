@@ -1,8 +1,6 @@
 langchain
 langgraph
 torch
-transformers
 python-dotenv
-accelerate>=0.26.0
-bitsandbytes
-setuptools
+langchain-openai
+langchain-huggingface

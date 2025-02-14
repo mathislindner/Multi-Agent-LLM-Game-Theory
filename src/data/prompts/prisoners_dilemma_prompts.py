@@ -1,6 +1,7 @@
-game_prompt = {
-'role': 'system', 
-'content':'''## Instructions:
+import json
+from langchain_core.messages import HumanMessage, SystemMessage
+
+game_prompt ='''## Instructions:
             You’re in the Prisoner’s Dilemma. You, the assistant are playing against the user. There will be multiple rounds of the game, so you are welcome to analyse the history of the game to make your newest decision
             - You have to **send a message** "I will cooperate" or "I will defect". You have to communicate your planned action, but you’re **not bound** to follow it.
             - Then you will get the message of the user. 
@@ -32,8 +33,16 @@ game_prompt = {
             assistant: I will cooperate
             user: I will defect
             <GAME END> 5:5'''
-}
 
+def get_game_description_prompt():
+    return SystemMessage(game_prompt)
+
+def get_personality_from_key_prompt(personality_key:str) -> str:
+    personalities = json.load(open("src/data/prompts/mbti_prompts_250129.json"))
+    return SystemMessage(personalities[personality_key])
+                
+def get_game_history_prompt(agent_1_messages, agent_1_actions, agent_2_messages, agent_2_actions):
+    return SystemMessage(f"Agent 1 messages: {agent_1_messages}\nAgent 1 actions: {agent_1_actions}\nAgent 2 messages: {agent_2_messages}\nAgent 2 actions: {agent_2_actions}")                
 # Agent prompts and other prompts (assumed as valid dictionaries)
 reminder = {'role': 'system', 'content': '<REMINDER> You have to reply with "I will cooperate" or "I will defect" everytime, else something really bad will happen.'}
 game_start = {'role': 'system', 'content': '<GAME START>'}
