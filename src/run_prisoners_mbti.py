@@ -6,7 +6,7 @@ import operator
 from src.models import get_model
 from langchain_core.tools import tool
 
-from src.data.prompts.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_prompt, get_call_for_action, get_call_for_message
+from src.data.prompts.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 
@@ -41,35 +41,38 @@ class MessageResponse(BaseModel):
 # Define the function that calls the model
 def call_model_action_node(model, agent_name:str):
     def call_model_action(state: PDState) -> PDState:
-        action_prompt: str = ""
-        action_prompt += state["game_description_prompt"]
-        action_prompt += get_game_history_prompt(agent_name, state["agent_1_messages"], state["agent_1_actions"], state["agent_2_messages"], state["agent_2_actions"], state["agent_1_scores"], state["agent_2_scores"], state["current_round"])
+        action_prompt = []
+        action_prompt.append(state["game_description_prompt"])
+        action_prompt.append(get_game_history_as_messages_prompt(agent_name, state, "action"))
         if agent_name == "agent_1":
-            action_prompt += get_personality_from_key_prompt(state["personality_key_1"])
+            action_prompt.append(get_personality_from_key_prompt(state["personality_key_1"]))
         else:
-            action_prompt += get_personality_from_key_prompt(state["personality_key_2"])
-        action_prompt += get_call_for_action()
+            action_prompt.append(get_personality_from_key_prompt(state["personality_key_2"]))
+        action_prompt.append(get_call_for_action())
         response = model.with_structured_output(ActionResponse).invoke(action_prompt)
-        #update state
+        # update state
         state[f"{agent_name}_actions"].append(response["action"])
         return state
     return call_model_action
 
 def call_model_message_node(model, agent_name:str):
     def call_model_message(state: PDState) -> PDState:
-        message_prompt = ""
-        message_prompt += state["game_description_prompt"]
+        message_prompt = []
+        message_prompt.append(state["game_description_prompt"])
         if agent_name == "agent_1":
-            message_prompt += get_personality_from_key_prompt(state["personality_key_1"])
+            agent_prompt = get_personality_from_key_prompt(state["personality_key_1"])
         else:
-            message_prompt += get_personality_from_key_prompt(state["personality_key_2"])
-        message_prompt += get_game_history_prompt(state["agent_1_messages"], state["agent_1_actions"], state["agent_2_messages"], state["agent_2_actions"], state["current_round"])
-        message_prompt += get_call_for_message()
+            agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
+        message_prompt.append(agent_prompt)
+        message_history = get_game_history_as_messages_prompt(agent_name, state, "message")
+        message_prompt.extend(message_history)
+        message_prompt.append(get_call_for_message())
         response = model.with_structured_output(MessageResponse).invoke(message_prompt)
+        message = response.message
         if agent_name == "agent_1":
-            state["agent_1_messages"].append(response["message"])
+            state["agent_1_messages"].append(message)
         else:
-            state["agent_2_messages"].append(response["message"])
+            state["agent_2_messages"].append(message)
         return state
     return call_model_message
 
@@ -101,7 +104,7 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     # get models
     model = get_model(model_name)
     #create graph
-    graph = StateGraph(PDState)
+    graph = StateGraph(PDState, input = PDState, output = PDState)
     #add nodes
     graph.add_node(f"distribute", lambda x: x) #This just exists, because you cannot distribute from a conditional edge
     graph.add_node(f"message_agent_1", call_model_message_node(model, "agent_1"))
@@ -119,9 +122,9 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     graph.add_edge("message_agent_1", "action_agent_2")
     graph.add_edge("message_agent_2", "action_agent_1")
     graph.add_edge("message_agent_2", "action_agent_2")
-    graph.add_edge("action_agent_1", "gather")
-    graph.add_edge("action_agent_2", "gather")
-    graph.add_edge("gather", "increment")
+    graph.add_edge("action_agent_1", "update_scores")
+    graph.add_edge("action_agent_2", "update_scores")
+    graph.add_edge("update_scores", "increment")
     graph.add_conditional_edges(
         source = "increment",
         path = should_continue,
@@ -135,7 +138,19 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #print mermaid
     print(compiled_graph.get_graph().draw_mermaid())
     #create initial state
-    game_description_prompt = "" #get from data.prompts #say how many total rounds will be played
-    initial_state = {"game_description_prompt":game_description_prompt, "personality_key_1":personality_key_1, "personality_key_2":personality_key_2, "current_round" : 1, "total_rounds" : total_rounds}
+    game_description_prompt = get_game_description_prompt() #get from data.prompts #say how many total rounds will be played
+    initial_state = PDState(
+        game_description_prompt=game_description_prompt,
+        personality_key_1=personality_key_1,
+        personality_key_2=personality_key_2,
+        agent_1_messages=[],
+        agent_1_actions=[],
+        agent_1_scores=[],
+        agent_2_messages=[],
+        agent_2_actions=[],
+        agent_2_scores=[],
+        current_round=1,
+        total_rounds=total_rounds
+    )
     end_state = compiled_graph.invoke(initial_state)
     return end_state
