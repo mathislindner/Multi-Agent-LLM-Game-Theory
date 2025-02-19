@@ -1,5 +1,6 @@
 
 from langgraph.graph import StateGraph, MessagesState, START, END
+from langgraph.types import Command
 from typing import TypedDict, List, Annotated, Literal
 from pydantic import BaseModel
 import operator
@@ -43,16 +44,16 @@ def call_model_action_node(model, agent_name:str):
     def call_model_action(state: PDState) -> PDState:
         action_prompt = []
         action_prompt.append(state["game_description_prompt"])
-        action_prompt.append(get_game_history_as_messages_prompt(agent_name, state, "action"))
         if agent_name == "agent_1":
             action_prompt.append(get_personality_from_key_prompt(state["personality_key_1"]))
         else:
             action_prompt.append(get_personality_from_key_prompt(state["personality_key_2"]))
+        action_history = get_game_history_as_messages_prompt(agent_name, state, "action")
+        action_prompt.extend(action_history)
         action_prompt.append(get_call_for_action())
         response = model.with_structured_output(ActionResponse).invoke(action_prompt)
-        # update state
-        state[f"{agent_name}_actions"].append(response["action"])
-        return state
+        action = response.action
+        return Command(update = {f"{agent_name}_actions" : [action]})
     return call_model_action
 
 def call_model_message_node(model, agent_name:str):
@@ -69,14 +70,10 @@ def call_model_message_node(model, agent_name:str):
         message_prompt.append(get_call_for_message())
         response = model.with_structured_output(MessageResponse).invoke(message_prompt)
         message = response.message
-        if agent_name == "agent_1":
-            state["agent_1_messages"].append(message)
-        else:
-            state["agent_2_messages"].append(message)
-        return state
+        return Command(update={f"{agent_name}_messages": [message]})
     return call_model_message
 
-def update_scores_node() -> None:
+def update_scores_node():
     def update_scores(state: PDState) -> PDState:
         payoff_matrix = {
             ("cooperate", "cooperate"): (3, 3),
@@ -92,13 +89,15 @@ def update_scores_node() -> None:
         return state
     return update_scores
     
-
-def increment_round(state: PDState) -> PDState:
-    state["current_round"] += 1
-    return state
+def increment_round_node():
+    def increment_round(state: PDState) -> PDState:
+        state["current_round"] += 1
+        return state
+    return increment_round
 
 def should_continue(state: PDState) -> bool:
     return (state["current_round"] <= state["total_rounds"])
+
 
 def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str) -> None:
     # get models
@@ -111,8 +110,8 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     graph.add_node(f"message_agent_2", call_model_message_node(model, "agent_2"))
     graph.add_node(f"action_agent_1", call_model_action_node(model, "agent_1"))
     graph.add_node(f"action_agent_2", call_model_action_node(model, "agent_2"))
-    graph.add_node(f"update_scores", update_scores_node)
-    graph.add_node(f"increment", increment_round)
+    graph.add_node(f"update_scores", update_scores_node())
+    graph.add_node(f"increment", increment_round_node())
     
     #add edges
     graph.add_edge(START, "distribute")

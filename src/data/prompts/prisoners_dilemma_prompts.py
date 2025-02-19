@@ -50,7 +50,7 @@ def get_game_description_prompt() -> SystemMessage:
 
 def get_call_for_action() -> SystemMessage:
     #TODO: maybe mention the last messages of the agents
-    return SystemMessage("According to the description, the game history, your personality, your last message and your the other agents message, give your action now.")
+    return SystemMessage("According to the description, the game history, your personality, your last message and your the other agents message, give your action now by replying with either 'cooperate' or 'defect'.")
 
 def get_call_for_message() -> SystemMessage:
     return SystemMessage("According to the description, the game history, your personality, your instrinsic goals, write the message you want to send to the other agent now.")
