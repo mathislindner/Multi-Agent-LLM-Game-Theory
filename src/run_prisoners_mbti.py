@@ -11,12 +11,13 @@ from langchain_core.tools import tool
 from src.data.prompts.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
-
+# https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
 #inherites from MessagesState but we added better structured output for better readability
 #messages: List[Dict[str, str]] = [] https://dev.to/jamesli/advanced-langgraph-implementing-conditional-edges-and-tool-calling-agents-3pdn
 
 class PromptState(BaseModel):
     agent_name: str
+    prompt_type: Literal["message", "action"]
     prompt: List[Union[HumanMessage, SystemMessage, AIMessage]]
 
 class PromptsState(BaseModel):
@@ -58,18 +59,17 @@ class PDState(TypedDict):
     current_message_prompts: Annotated[List[PromptsState], operator.add] #TODO need to clear these at the end of each round
     current_action_prompts: Annotated[List[PromptsState], operator.add]
     
-
 def get_agent_message_promptstate(agent_name: str, state: PDState) -> PromptState:
     message_prompt = []
     if agent_name == "agent_1":
-        agent_prompt = get_personality_from_key_prompt(state["personality_key_1"])
+        agent_prompt = get_personality_from_key_prompt(state["personality_key_1"]) #TODO could rename key to easily access it without if
     else:
         agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
     message_prompt.append(agent_prompt)
     message_history = get_game_history_as_messages_prompt(agent_name, state, "message")
     message_prompt.extend(message_history)
     message_prompt.append(get_call_for_message())
-    return PromptState(agent_name=agent_name, prompt=message_prompt, prompt_type="message")
+    return PromptState(agent_name=agent_name, prompt_type="message", prompt=message_prompt)
 
 def get_agent_action_promptstate(agent_name: str, state: PDState) -> PromptState:
     action_prompt = []
@@ -94,15 +94,15 @@ def generate_actions_prompts(state: PDState):
     return {"current_action_prompts" : MessagesState(message_prompt_states=[agent_1_action_state, agent_2_action_state])}
 
 
-
-#TODO: think abou thow we acn identify who sent what, since we can't just add it to a list witohut knowing sender 
-def invoke_from_prompt_state(state: PromptState):
-    prompt = state.prompt
-    agent_name = state.agent_name
-    response = model.with_structured_output(MessageResponse).invoke(prompt)
-    message = response.message
-    return {f"{agent_name}_messages": [message]}
-
+def invoke_from_prompt_state_node(model):
+    def invoke_from_prompt_state(state: PromptState):
+        prompt = state.prompt
+        agent_name = state.agent_name
+        prompt_type = state["prompt_type"]
+        response = model.with_structured_output(MessageResponse).invoke(prompt)
+        message = response.message
+        return {f"{agent_name}_{prompt_type}s": [message]}
+    return invoke_from_prompt_state
 
 
 def update_scores_node():
@@ -137,26 +137,12 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #create graph
     graph = StateGraph(PDState, input = PDState, output = PDState)
     #add nodes
-    graph.add_node(f"map", lambda x: x) #This just exists, because you cannot map from a conditional edge
-    graph.add_node(f"message_agent_1", call_model_message_node(model, "agent_1"))
-    graph.add_node(f"message_agent_2", call_model_message_node(model, "agent_2"))
-    graph.add_node(f"reduce_and_map", reduce_and_map_node) #to
-    graph.add_node(f"action_agent_1", call_model_action_node(model, "agent_1"))
-    graph.add_node(f"action_agent_2", call_model_action_node(model, "agent_2"))
-    graph.add_node(f"update_scores", update_scores_node())
-    graph.add_node(f"increment", increment_round_node())
+    graph.add_node(f"generate_messages_prompts", generate_messages_prompts)
+    graph.add_node("generate_action_prompts")
     
     #add edges
     graph.add_edge(START, "map")
-    graph.add_edge("map", "message_agent_1")
-    graph.add_edge("map", "message_agent_2")
-    graph.add_edge("message_agent_1", "action_agent_1")
-    graph.add_edge("message_agent_1", "action_agent_2")
-    graph.add_edge("message_agent_2", "action_agent_1")
-    graph.add_edge("message_agent_2", "action_agent_2")
-    graph.add_edge("action_agent_1", "update_scores")
-    graph.add_edge("action_agent_2", "update_scores")
-    graph.add_edge("update_scores", "increment")
+    
     graph.add_conditional_edges(
         source = "increment",
         path = should_continue,
