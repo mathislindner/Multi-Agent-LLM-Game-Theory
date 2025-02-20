@@ -110,7 +110,7 @@ def invoke_from_prompt_state_node(model):
 
 def map_prompts_node(prompt_type):
     def map_prompts(state: PDState):
-        return [Send("invoke_from_prompt_state", prompt_state) for prompt_state in state[f"current_{prompt_type}_prompts"]]
+        return [Send("invoke_from_prompt_state", prompt_state) for prompt_state in state[f"current_{prompt_type}_prompts"]] #TODO: check if this is a PromptState for sure!!!
     return map_prompts
 
 def update_state_node():
