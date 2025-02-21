@@ -10,6 +10,8 @@ def main(model_id, rounds, agent_1_persona, agent_2_persona):
     print(game_state)
 
 if __name__ == "__main__":
+    main(model_id= 'gpt-4o-mini', rounds=2, agent_1_persona="INFP", agent_2_persona = "ENTP")
+    """     
     personality_choices = json.load(open("src/data/prompts/mbti_prompts_250129.json")).keys()
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_id", type=str, help="The model id to use for the game", required=True)
@@ -17,5 +19,5 @@ if __name__ == "__main__":
     parser.add_argument("--agent_1_persona", choices = personality_choices, help="The personality of agent 1", required=True)
     parser.add_argument("--agent_2_persona", choices = personality_choices, help="The personality of agent 2", required=True)
     args = parser.parse_args()
-    main(model_id=args.model_id, rounds=args.rounds, agent_1_persona=args.agent_1_persona, agent_2_persona=args.agent_2_persona)
+    main(model_id=args.model_id, rounds=args.rounds, agent_1_persona=args.agent_1_persona, agent_2_persona=args.agent_2_persona)"""
 
