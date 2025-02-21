@@ -61,11 +61,9 @@ class PDState(TypedDict):
     agent_2_scores: Annotated[List[int], operator.add]
     
     current_round: int
-    current_message_prompts: Annotated[list, operator.add] #TODO need to clear these at the end of each round
-    current_action_prompts: Annotated[list, operator.add]
     
-    current_message_responses: Annotated[List[LLMReply], operator.add]
-    current_action_responses: Annotated[List[LLMReply], operator.add]
+    current_message_responses: Annotated[list, operator.add]
+    current_action_responses: Annotated[list, operator.add]
     
 def get_agent_message_annotated_prompt(agent_name: str, state: PDState) -> AnnotatedPrompt:
     message_prompt = []
@@ -77,7 +75,7 @@ def get_agent_message_annotated_prompt(agent_name: str, state: PDState) -> Annot
     message_history = get_game_history_as_messages_prompt(agent_name, state, "message")
     message_prompt.extend(message_history)
     message_prompt.append(get_call_for_message())
-    return AnnotatedPrompt(agent_name=agent_name, prompt_type="message", prompt=message_prompt)
+    return Command( update = AnnotatedPrompt(agent_name=agent_name, prompt_type="message", prompt=message_prompt))
 
 def get_agent_action_annotated_prompt(agent_name: str, state: PDState) -> AnnotatedPrompt:
     action_prompt = []
@@ -89,7 +87,7 @@ def get_agent_action_annotated_prompt(agent_name: str, state: PDState) -> Annota
     action_history = get_game_history_as_messages_prompt(agent_name, state, "action")
     action_prompt.extend(action_history)
     action_prompt.append(get_call_for_action())
-    return AnnotatedPrompt(agent_name=agent_name, prompt_type="action", prompt=action_prompt)
+    return Command( update = AnnotatedPrompt(agent_name=agent_name, prompt_type="action", prompt=action_prompt))
 
 def send_messages_prompts(state: PDState):
     agent_1_annotated_prompt_state = get_agent_message_annotated_prompt("agent_1", state)
@@ -113,7 +111,8 @@ def invoke_from_prompt_state_node(model, bar):
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
         #print(agent_name, prompt_type, message)
-        return {f"current_{prompt_type}_responses": [LLMReply(agent_name=agent_name, message=message, reply_type = prompt_type)]}
+        reply = LLMReply(agent_name=agent_name, message=message, reply_type = prompt_type)
+        return Command(update = {f"current_{prompt_type}_responses": [reply]})
     return invoke_from_prompt_state
 
 """
@@ -127,13 +126,18 @@ def update_state_node():
     def update_state(state: PDState) -> PDState:
         # add current message and action to actions and messages
         # from the MessageReponseState get the message and agent_name to put it as a string in the correct lists
+        #TODO: the issue is that here we have doubled the messages and actions, for some reason???
+        state_updates = {}
+        print(len(state["current_message_responses"]))
+        print(len(state["current_action_responses"]))
         for message_state in state["current_message_responses"]:
             state[f"{message_state.agent_name}_messages"].append(message_state.message)
+            
         for action_state in state["current_action_responses"]:
-            state[f"{action_state.agent_name}_actions"].append(action_state.action)
+            state[f"{action_state.agent_name}_actions"].append(action_state.message) #this is message because of LLMReply format
         #remove current message and action
-        state["current_message_responses"] = []
-        state["current_action_responses"] = []
+        state_updates["current_message_responses"] = [] #TODO: this might not work??
+        state_updates["current_action_responses"] = []
         
         # update scores
         payoff_matrix = {
@@ -147,46 +151,61 @@ def update_state_node():
         score_agent1, score_agent2 = payoff_matrix[(agent_1_decision, agent_2_decision)]
         
         # add scores to scores
-        state["agent_1_scores"].append(score_agent1)
-        state["agent_2_scores"].append(score_agent2)
+        state_updates["agent_1_scores"] = [score_agent1]
+        state_updates["agent_2_scores"] = [score_agent2]
         
         #increment round
-        state["current_round"] += 1    
-        return state
+        state_updates["current_round"] = state["current_round"] + 1  
+        #TODO: maybe use Command
+        return Command(update = state_updates)
     return update_state
 
 def should_continue(state: PDState) -> bool:
-    return (state["current_round"] <= state["total_rounds"])
-
-def action_taken(state: PDState) -> bool:
-    return (len(state["current_action_prompts"]) > 0)
+    print("should continue??")
+    return (state["current_round"] < state["total_rounds"])
     
+def test1(state: PDState) -> PDState:
+    print("getting called before message")
+    return {}
+    
+def test2(state: PDState) -> PDState:
+    print("getting called after message")
+    return {}
+
+def test3(state: PDState) -> PDState:
+    print("getting called before action")
+    return {}
+
+def test4(state: PDState) -> PDState:
+    print("getting called after action")
+    return {}
+
 def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str) -> None:
     # get models
     model = get_model(model_name)
     #create graph
     graph = StateGraph(PDState, input = PDState, output = PDState)
     #add nodes
-    graph.add_node("lambda_to_messages", lambda x:x)
-    graph.add_node("lambda_from_messages", lambda x:x)
+    graph.add_node("lambda_to_messages", test1)
+    graph.add_node("lambda_from_messages", test2)
     graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model,"ya")) #doing this because else we fall into a weird recursion state
     graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model,"yo"))
-    graph.add_node(f"lambda_to_actions", lambda x:x)
-    graph.add_node("lambda_from_actions", lambda x:x)
+    graph.add_node(f"lambda_to_actions", test3)
+    graph.add_node("lambda_from_actions", test4)
     graph.add_node("update_state", update_state_node())
     
     #add edges
     graph.add_edge(START, "lambda_to_messages")
     graph.add_conditional_edges(
         source = "lambda_to_messages", 
-        path = send_messages_prompts, #TODO: is this correct?? is this really a path?
+        path = send_messages_prompts,
         path_map = ["invoke_from_prompt_state_message"]
         )
     graph.add_edge("invoke_from_prompt_state_message","lambda_from_messages")
     #graph.add_edge("gather_messages", "generate_actions_prompts")
     graph.add_conditional_edges(
         source = "lambda_from_messages", 
-        path = send_actions_prompts, #TODO: is this correct?? is this really a path?
+        path = send_actions_prompts,
         path_map = ["invoke_from_prompt_state_action"]
         )
     graph.add_edge("invoke_from_prompt_state_action","lambda_from_actions")
