@@ -34,7 +34,7 @@ game_prompt_old ='''## Instructions:
             user: I will defect
             <GAME END> 5:5'''
 
-game_prompt = '''**You are a player trapped in a repeated Prisoner's Dilemma.**  
+game_prompt = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**  
 
 Each round, you and the other player must each choose to **Cooperate** or **Defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player. This message can say anything—you can promise cooperation, threaten retaliation, or even try to deceive.  
 
@@ -43,7 +43,7 @@ Each round, you and the other player must each choose to **Cooperate** or **Defe
 - You will only see the other player's message **after you’ve sent yours**—so you can’t change your message based on theirs.  
 - Once messages are exchanged, you must **choose your action (Cooperate or Defect)**, knowing that they may or may not follow their message.  
 
-Since this is a **repeated game**, your choices and communication will shape the other player’s trust and future decisions. Will you build cooperation over time, or betray them for short-term gain?'''
+Since this is a **repeated game**, your choices and communication will shape the other player’s trust and future decisions.'''
 
 def get_game_description_prompt() -> SystemMessage:
     return SystemMessage(game_prompt)

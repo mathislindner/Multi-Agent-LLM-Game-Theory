@@ -41,7 +41,7 @@ class ActionResponse(BaseModel):
     """Repond with action to take: cooperate or defect."""
     action: str
 class MessageResponse(BaseModel):
-    """Respond with message to send to the other agent."""
+    """Respond with a sentence to send to the other agent."""
     message: str
     
 class PDState(TypedDict):
@@ -62,11 +62,12 @@ class PDState(TypedDict):
     
     current_round: int
     
-    current_message_responses: Annotated[list, operator.add]
-    current_action_responses: Annotated[list, operator.add]
+    #current_message_responses: Annotated[list, operator.add]
+    #current_action_responses: Annotated[list, operator.add]
     
 def get_agent_message_annotated_prompt(agent_name: str, state: PDState) -> AnnotatedPrompt:
     message_prompt = []
+    message_prompt.append(state["game_description_prompt"])
     if agent_name == "agent_1":
         agent_prompt = get_personality_from_key_prompt(state["personality_key_1"]) #TODO could rename key to easily access it without if
     else:
@@ -75,10 +76,11 @@ def get_agent_message_annotated_prompt(agent_name: str, state: PDState) -> Annot
     message_history = get_game_history_as_messages_prompt(agent_name, state, "message")
     message_prompt.extend(message_history)
     message_prompt.append(get_call_for_message())
-    return Command( update = AnnotatedPrompt(agent_name=agent_name, prompt_type="message", prompt=message_prompt))
+    return AnnotatedPrompt(agent_name=agent_name, prompt_type="message", prompt=message_prompt)
 
 def get_agent_action_annotated_prompt(agent_name: str, state: PDState) -> AnnotatedPrompt:
     action_prompt = []
+    action_prompt.append(state["game_description_prompt"])
     if agent_name == "agent_1":
         agent_prompt = get_personality_from_key_prompt(state["personality_key_1"])
     else:
@@ -87,7 +89,7 @@ def get_agent_action_annotated_prompt(agent_name: str, state: PDState) -> Annota
     action_history = get_game_history_as_messages_prompt(agent_name, state, "action")
     action_prompt.extend(action_history)
     action_prompt.append(get_call_for_action())
-    return Command( update = AnnotatedPrompt(agent_name=agent_name, prompt_type="action", prompt=action_prompt))
+    return AnnotatedPrompt(agent_name=agent_name, prompt_type="action", prompt=action_prompt)
 
 def send_messages_prompts(state: PDState):
     agent_1_annotated_prompt_state = get_agent_message_annotated_prompt("agent_1", state)
@@ -101,7 +103,7 @@ def send_actions_prompts(state: PDState):
     agent_2_annotated_prompt_state = get_agent_action_annotated_prompt("agent_2", state)
     return [Send("invoke_from_prompt_state_action", agent_1_annotated_prompt_state), Send("invoke_from_prompt_state_action", agent_2_annotated_prompt_state)]
 
-def invoke_from_prompt_state_node(model, bar):
+def invoke_from_prompt_state_node(model):
     def invoke_from_prompt_state(state : AnnotatedPrompt):
         prompt = state.prompt
         agent_name = state.agent_name
@@ -110,35 +112,12 @@ def invoke_from_prompt_state_node(model, bar):
         print("invoking model...")
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
-        #print(agent_name, prompt_type, message)
-        reply = LLMReply(agent_name=agent_name, message=message, reply_type = prompt_type)
-        return Command(update = {f"current_{prompt_type}_responses": [reply]})
+        return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
-
-"""
-    def map_prompts_node(prompt_type):
-        def map_prompts(state: PDState):
-            return [Send("invoke_from_prompt_state", prompt_state) for prompt_state in state[f"current_{prompt_type}_prompts"]] #TODO: check if this is a PromptState for sure!!!
-        return map_prompts
-"""
 
 def update_state_node():
     def update_state(state: PDState) -> PDState:
-        # add current message and action to actions and messages
-        # from the MessageReponseState get the message and agent_name to put it as a string in the correct lists
-        #TODO: the issue is that here we have doubled the messages and actions, for some reason???
         state_updates = {}
-        print(len(state["current_message_responses"]))
-        print(len(state["current_action_responses"]))
-        for message_state in state["current_message_responses"]:
-            state[f"{message_state.agent_name}_messages"].append(message_state.message)
-            
-        for action_state in state["current_action_responses"]:
-            state[f"{action_state.agent_name}_actions"].append(action_state.message) #this is message because of LLMReply format
-        #remove current message and action
-        state_updates["current_message_responses"] = [] #TODO: this might not work??
-        state_updates["current_action_responses"] = []
-        
         # update scores
         payoff_matrix = {
             ("cooperate", "cooperate"): (3, 3),
@@ -155,8 +134,7 @@ def update_state_node():
         state_updates["agent_2_scores"] = [score_agent2]
         
         #increment round
-        state_updates["current_round"] = state["current_round"] + 1  
-        #TODO: maybe use Command
+        state_updates["current_round"] = state["current_round"] + 1 
         return Command(update = state_updates)
     return update_state
 
@@ -188,8 +166,8 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #add nodes
     graph.add_node("lambda_to_messages", test1)
     graph.add_node("lambda_from_messages", test2)
-    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model,"ya")) #doing this because else we fall into a weird recursion state
-    graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model,"yo"))
+    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model)) #doing this because else we fall into a weird recursion state
+    graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model))
     graph.add_node(f"lambda_to_actions", test3)
     graph.add_node("lambda_from_actions", test4)
     graph.add_node("update_state", update_state_node())
