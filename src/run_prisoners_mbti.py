@@ -134,7 +134,7 @@ def update_state_node(game_name: str):
     return update_state
 
 def should_continue(state: PDState) -> bool:
-    print("should continue??")
+    print("current round: ", state["current_round"])
     return (state["current_round"] <= state["total_rounds"])
     
 def test1(state: PDState) -> dict:
