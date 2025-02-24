@@ -34,50 +34,48 @@ game_prompt_old ='''## Instructions:
             user: I will defect
             <GAME END> 5:5'''
 game_prompt_PD = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**  
+Each round, you and the other player must each choose to **cooperate** or **defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
+You have access to the game history.
+You are competing to win the most points in this game. Your goal is not to ensure fairness or cooperation but to get the highest possible reward for yourself.
 
-Each round, you and the other player must each choose to **Cooperate** or **Defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.  
-Your goal is to maximize your score.
 **But here's the catch:**  
 - You are **not bound** to follow through on what you wrote. You can lie, bluff, or stay true to your word.  
 - You will only see the other player's message **after you’ve sent yours**—so you can’t change your message based on theirs.  
 - Once messages are exchanged, you must **choose your action (Cooperate or Defect)**, knowing that they may or may not follow their message.'''
 
 game_prompt_SH = '''**You are a player trapped in a repeated Stag Hunt game with communication.**  
-Each round, you and the other player must choose to **Hunt Stag** or **Hunt Hare**, but you won’t know what the other will do beforehand. However, before making your decision, you can send a **message** to the other player. This message can say anything—you can promise to go for the stag, suggest playing it safe, or even try to mislead them.  
-Your goal is to maximize your score.
-**But here’s the catch:**  
-- You are **not bound** to follow through on your message. You can lie, bluff, or stay true to your word.
-- You will only see the other player’s message **after you’ve sent yours**—so you can’t change your message based on theirs.  
+Each round, you and the other player must each choose to **hunt Stag** or **hunt Hare** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.  
+You have access to the game history.  
+You are competing to win the most points in this game. Your goal is not necessarily fairness or cooperation, but to maximize your own reward.  
+
+**But here's the catch:**  
+- You are **not bound** to follow through on what you wrote. You can lie, bluff, or stay true to your word.  
+- You will only see the other player's message **after you’ve sent yours**—so you can’t change your message based on theirs.  
 - Once messages are exchanged, you must **choose your action (Hunt Stag or Hunt Hare)**, knowing that they may or may not follow their message.'''
 
-def get_game_description_prompt() -> SystemMessage:
-    return SystemMessage(game_prompt_PD)
+
+def get_game_description_prompt(game_name) -> SystemMessage:
+    print(game_name)
+    game_description = ""
+    if game_name == "prisoners_dilemma":
+        game_description = game_prompt_PD
+    elif game_name == "stag_hunt":
+        game_description = game_prompt_SH
+    else:
+        raise ValueError("game_name must be 'prisoners_dilemma' or 'stag_hunt'")
+        
+    return SystemMessage(game_description)
 
 def get_call_for_action() -> SystemMessage:
     #TODO: maybe mention the last messages of the agents
-    return SystemMessage("According to the description, the game history, your personality, your last message and your the other agents message, give your action now by replying with either 'cooperate' or 'defect'.")
+    return SystemMessage("According to the description, the game history, your personality, your last message and your the other agents message, give your action now")
 
 def get_call_for_message() -> SystemMessage:
     return SystemMessage("According to the description, the game history, your personality, your instrinsic goals, write the message you want to send to the other agent now.")
 
 def get_personality_from_key_prompt(personality_key:str) -> SystemMessage:
-    personalities = json.load(open("src/data/prompts/mbti_prompts_250129.json"))
+    personalities = json.load(open("src/prompting/mbti_prompts_250129.json"))
     return SystemMessage(personalities[personality_key])
-             
-def get_game_history_xml_prompt(current_agent, agent_1_messages, agent_1_actions, agent_2_messages, agent_2_actions, agent_1_scores, agent_2_scores, current_round) -> SystemMessage:
-    game_history = "<GAME HISTORY>\n"
-    for round_num in range(1, current_round + 1):
-        game_history += f"""
-        <ROUND {round_num}>
-            <AGENT 1 MESSAGE>{agent_1_messages[round_num - 1]}</AGENT 1 MESSAGE>
-            <AGENT 2 MESSAGE>{agent_2_messages[round_num - 1]}</AGENT 2 MESSAGE>
-            <AGENT 1 ACTION>{agent_1_actions[round_num - 1]}</AGENT 1 ACTION>
-            <AGENT 2 ACTION>{agent_2_actions[round_num - 1]}</AGENT 2 ACTION>
-            <AGENT 1 SCORE> {agent_1_scores[round_num - 1]} </AGENT 1 SCORE>
-            <AGENT 2 SCORE> {agent_2_scores[round_num - 1]} </AGENT 2 SCORE>
-        </ROUND {round_num}>"""
-    game_history += "</GAME HISTORY>"
-    return SystemMessage(game_history)
 
 def get_game_history_as_messages_prompt(current_agent, state, history_type: str):
     #TODO add this to game state for each agent, this becomes to much computation for no reason to rewrite everytime.
@@ -107,7 +105,6 @@ def get_game_history_as_messages_prompt(current_agent, state, history_type: str)
         current_agent_scores = agent_2_scores
         other_agent_scores = agent_1_scores
 
-    # in the last round  that has been played, no action or messages will exist for the current round, for the action, only the messages will exist, so make sure with the indices
     for round_num in range(1, current_round + 1):
         if round_num <= len(agent_1_messages) and round_num <= len(agent_2_messages):
             game_history.append(agent_1_message_type(agent_1_messages[round_num - 1]))
@@ -120,16 +117,10 @@ def get_game_history_as_messages_prompt(current_agent, state, history_type: str)
                 current_agent_total_score = sum(current_agent_scores[:round_num])
                 other_agent_total_score = sum(other_agent_scores[:round_num])
                 game_history.append(SystemMessage(f"Your total score {current_agent_total_score} : {other_agent_total_score} Their total score"))
-    # Add the last messages if history_type is "message"
-    if history_type == "message":
+    # Add the last messages if history_type is "action"
+    if history_type == "action":
         if current_round <= len(agent_1_messages):
             game_history.append(agent_1_message_type(agent_1_messages[current_round - 1]))
         if current_round <= len(agent_2_messages):
             game_history.append(agent_2_message_type(agent_2_messages[current_round - 1]))
     return game_history
-
-# Agent prompts and other prompts (assumed as valid dictionaries)
-reminder = {'role': 'system', 'content': '<REMINDER> You have to reply with "I will cooperate" or "I will defect" everytime, else something really bad will happen.'}
-game_start = {'role': 'system', 'content': '<GAME START>'}
-call_for_message = {'role': 'system', 'content':'# communicate your decision now'}
-call_for_decision = {'role': 'system', 'content':'# take your decision now'}
