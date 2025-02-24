@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import operator
 from src.models import get_model
 from langchain_core.tools import tool
+from langchain_core.runnables import RunnableLambda
 
 from src.data.prompts.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
 # https://blog.langchain.dev/langgraph/
@@ -151,5 +152,5 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
         current_round=1,
         total_rounds=total_rounds
     )
-    end_state = compiled_graph.invoke(initial_state)
+    end_state = compiled_graph.invoke(initial_state, config={"recursion_limit": 200})
     return end_state

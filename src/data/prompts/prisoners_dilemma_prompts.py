@@ -34,19 +34,25 @@ game_prompt_old ='''## Instructions:
             user: I will defect
             <GAME END> 5:5'''
 
-game_prompt = '''**You are a player trapped in a repeated Prisoner's Dilemma.**  
+game_prompt_PD = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**  
 
-Each round, you and the other player must each choose to **Cooperate** or **Defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player. This message can say anything—you can promise cooperation, threaten retaliation, or even try to deceive.  
-
+Each round, you and the other player must each choose to **Cooperate** or **Defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.  
+Your goal is to maximize your score.
 **But here's the catch:**  
 - You are **not bound** to follow through on what you wrote. You can lie, bluff, or stay true to your word.  
 - You will only see the other player's message **after you’ve sent yours**—so you can’t change your message based on theirs.  
-- Once messages are exchanged, you must **choose your action (Cooperate or Defect)**, knowing that they may or may not follow their message.  
+- Once messages are exchanged, you must **choose your action (Cooperate or Defect)**, knowing that they may or may not follow their message.'''
 
-Since this is a **repeated game**, your choices and communication will shape the other player’s trust and future decisions. Will you build cooperation over time, or betray them for short-term gain?'''
+game_prompt_SH = '''**You are a player trapped in a repeated Stag Hunt game with communication.**  
+Each round, you and the other player must choose to **Hunt Stag** or **Hunt Hare**, but you won’t know what the other will do beforehand. However, before making your decision, you can send a **message** to the other player. This message can say anything—you can promise to go for the stag, suggest playing it safe, or even try to mislead them.  
+Your goal is to maximize your score.
+**But here’s the catch:**  
+- You are **not bound** to follow through on your message. You can lie, bluff, or stay true to your word.
+- You will only see the other player’s message **after you’ve sent yours**—so you can’t change your message based on theirs.  
+- Once messages are exchanged, you must **choose your action (Hunt Stag or Hunt Hare)**, knowing that they may or may not follow their message.'''
 
 def get_game_description_prompt() -> SystemMessage:
-    return SystemMessage(game_prompt)
+    return SystemMessage(game_prompt_PD)
 
 def get_call_for_action() -> SystemMessage:
     #TODO: maybe mention the last messages of the agents
