@@ -8,8 +8,9 @@ import operator
 from src.models import get_model
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableLambda
+import json
 
-from src.data.prompts.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
+from src.prompting.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
@@ -20,16 +21,6 @@ class AnnotatedPrompt(BaseModel):
     agent_name: str
     prompt_type: Literal["message", "action"]
     prompt: List[Union[HumanMessage, SystemMessage, AIMessage]]
-    
-"""
-class MessageReponseState(BaseModel):
-    agent_name: str
-    message: str
-        
-class ActionResponseState(BaseModel):
-    agent_name: str
-    action: Literal["cooperate", "defect"]
-"""
 
 class LLMReply(BaseModel):
     agent_name: str
@@ -38,9 +29,14 @@ class LLMReply(BaseModel):
     
 
 #These are for the models structured output
-class ActionResponse(BaseModel):
+class PDActionResponse(BaseModel):
     """Repond with action to take: cooperate or defect."""
-    action: str
+    action: Literal["cooperate", "defect"]
+    
+class SHActionResponse(BaseModel):
+    """Repond with action to take: stag or hare."""
+    action: Literal["stag", "hare"]
+    
 class MessageResponse(BaseModel):
     """Respond with a sentence to send to the other agent."""
     message: str
@@ -104,7 +100,7 @@ def send_actions_prompts(state: PDState):
     agent_2_annotated_prompt_state = get_agent_action_annotated_prompt("agent_2", state)
     return [Send("invoke_from_prompt_state_action", agent_1_annotated_prompt_state), Send("invoke_from_prompt_state_action", agent_2_annotated_prompt_state)]
 
-def invoke_from_prompt_state_node(model):
+def invoke_from_prompt_state_node(model, ActionResponse):
     def invoke_from_prompt_state(state : AnnotatedPrompt):
         prompt = state.prompt
         agent_name = state.agent_name
@@ -116,19 +112,17 @@ def invoke_from_prompt_state_node(model):
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 
-def update_state_node():
+def update_state_node(game_name: str):
     def update_state(state: PDState) -> PDState:
         state_updates = {}
+        payoff_matrix = {}
+        with (open("/cluster/home/mlindner/Github/master_thesis_project/src/prompting/payoff_matrices.json")) as f:
+            payoff_matrix = json.load(f)[game_name]
+        
         # update scores
-        payoff_matrix = {
-            ("cooperate", "cooperate"): (3, 3),
-            ("cooperate", "defect"): (0, 5),
-            ("defect", "cooperate"): (5, 0),
-            ("defect", "defect"): (1, 1),
-        }
         agent_1_decision = state["agent_1_actions"][-1]
         agent_2_decision = state["agent_2_actions"][-1]
-        score_agent1, score_agent2 = payoff_matrix[(agent_1_decision, agent_2_decision)]
+        score_agent1, score_agent2 = payoff_matrix[agent_1_decision][agent_2_decision]
         
         # add scores to scores
         state_updates["agent_1_scores"] = [score_agent1]
@@ -141,37 +135,37 @@ def update_state_node():
 
 def should_continue(state: PDState) -> bool:
     print("should continue??")
-    return (state["current_round"] < state["total_rounds"])
+    return (state["current_round"] <= state["total_rounds"])
     
-def test1(state: PDState) -> PDState:
-    print("getting called before message")
+def test1(state: PDState) -> dict:
     return {}
     
-def test2(state: PDState) -> PDState:
-    print("getting called after message")
+def test2(state: PDState) -> dict:
     return {}
 
-def test3(state: PDState) -> PDState:
-    print("getting called before action")
+def test3(state: PDState) -> dict:
     return {}
 
-def test4(state: PDState) -> PDState:
-    print("getting called after action")
+def test4(state: PDState) -> dict:
     return {}
 
-def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str) -> None:
+def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str) -> PDState:
     # get models
     model = get_model(model_name)
+    if game_name == "prisoners_dilemma":
+        ActionResponse = PDActionResponse
+    elif game_name == "stag_hunt":
+        ActionResponse = SHActionResponse
     #create graph
     graph = StateGraph(PDState, input = PDState, output = PDState)
     #add nodes
     graph.add_node("lambda_to_messages", test1)
     graph.add_node("lambda_from_messages", test2)
-    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model)) #doing this because else we fall into a weird recursion state
-    graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model))
+    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model, ActionResponse)) #doing this because else we fall into a weird recursion state
+    graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model, ActionResponse))
     graph.add_node(f"lambda_to_actions", test3)
     graph.add_node("lambda_from_actions", test4)
-    graph.add_node("update_state", update_state_node())
+    graph.add_node("update_state", update_state_node(game_name))
     
     #add edges
     graph.add_edge(START, "lambda_to_messages")
@@ -202,7 +196,7 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #print mermaid
     print(compiled_graph.get_graph().draw_mermaid())
     #create initial state
-    game_description_prompt = get_game_description_prompt() #get from data.prompts #say how many total rounds will be played
+    game_description_prompt = get_game_description_prompt(game_name) #get from data.prompts #say how many total rounds will be played
     initial_state = PDState(
         game_description_prompt=game_description_prompt,
         personality_key_1=personality_key_1,

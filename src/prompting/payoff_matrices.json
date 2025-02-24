@@ -1,0 +1,22 @@
+{
+    "prisoners_dilemma": {
+        "cooperate": {
+            "cooperate": [3, 3],
+            "defect": [0, 5]
+        },
+        "defect": {
+            "cooperate": [5, 0],
+            "defect": [1, 1]
+        }
+    },
+    "stag_hunt": {
+        "stag": {
+            "stag": [10, 10],
+            "hare": [1, 8]
+        },
+        "hare": {
+            "stag": [8, 1],
+            "hare": [5, 5]
+        }
+    }
+}
