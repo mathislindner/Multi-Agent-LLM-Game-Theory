@@ -33,8 +33,6 @@ game_prompt_old ='''## Instructions:
             assistant: I will cooperate
             user: I will defect
             <GAME END> 5:5'''
-
-game_prompt = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**  
 game_prompt_PD = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**  
 
 Each round, you and the other player must each choose to **Cooperate** or **Defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.  
