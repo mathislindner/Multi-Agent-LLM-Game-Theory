@@ -126,10 +126,4 @@ def get_game_history_as_messages_prompt(current_agent, state, history_type: str)
                 current_agent_total_score = sum(current_agent_scores[:round_num])
                 other_agent_total_score = sum(other_agent_scores[:round_num])
                 game_history.append(SystemMessage(f"Your total score {current_agent_total_score} : {other_agent_total_score} Their total score"))
-    # Add the last messages if history_type is "action"
-    if history_type == "action":
-        if current_round <= len(agent_1_messages):
-            game_history.append(agent_1_message_type(agent_1_messages[current_round - 1]))
-        if current_round <= len(agent_2_messages):
-            game_history.append(agent_2_message_type(agent_2_messages[current_round - 1]))
     return game_history
