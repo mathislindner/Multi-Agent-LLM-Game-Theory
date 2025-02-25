@@ -93,10 +93,10 @@ def invoke_from_prompt_state_node(model, ActionResponse):
         agent_name = state.agent_name
         prompt_type = state.prompt_type
         Structure = MessageResponse if prompt_type == "message" else ActionResponse
-        print("invoking model...")
-        print(f"prompt type: {prompt_type}")
-        print(f"agent name: {agent_name}")
-        print(f"prompt: {prompt}")
+        #print("invoking model...")
+        #print(f"prompt type: {prompt_type}")
+        #print(f"agent name: {agent_name}")
+        #print(f"prompt: {prompt}")
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
@@ -124,7 +124,6 @@ def update_state_node(game_name: str):
     return update_state
 
 def should_continue(state: PDState) -> bool:
-    print("current round: ", state["current_round"])
     return (state["current_round"] <= state["total_rounds"])
 
 def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str) -> PDState:
@@ -172,7 +171,7 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #compile and run
     compiled_graph = graph.compile()
     #print mermaid
-    print(compiled_graph.get_graph().draw_mermaid())
+    #print(compiled_graph.get_graph().draw_mermaid())
     #create initial state
     game_description_prompt = get_game_description_prompt(game_name) #get from data.prompts #say how many total rounds will be played
     initial_state = PDState(
@@ -183,7 +182,6 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
         total_rounds=total_rounds
     )
     end_state = compiled_graph.invoke(initial_state, config={"recursion_limit": 200, "callbacks": [callback_handler]})
-    print(f"Total Tokens Used: {callback_handler.total_tokens}")
     print(f"Total Cost (USD): ${callback_handler.total_cost}")
     #save results in pd df
     path_to_csv = "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250225.csv"
@@ -209,6 +207,9 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
         df = pd.read_csv(path_to_csv)
     except FileNotFoundError:
         df = pd.DataFrame(columns=columns)
-    df = pd.concat([df, new_row], ignore_index=True)
+    if df.empty:
+        df = new_row
+    else:
+        df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(path_to_csv, mode='w', header=True, index=False)
     return end_state

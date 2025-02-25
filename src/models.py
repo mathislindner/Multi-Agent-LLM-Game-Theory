@@ -11,7 +11,7 @@ def get_model(model_name: str):
         logging.info(f"Creating OpenAI model: {model_name}")
         return ChatOpenAI(
             model=model_name,
-            temperature=0, #TODO: multiple runs becomes useless if we do multiple runs.
+            temperature=0,
             seed=42,
             max_retries=2,
             api_key=os.getenv("OPENAI_API_KEY")
@@ -30,7 +30,6 @@ def get_model(model_name: str):
                 task="text-generation",
                 device=device,        
                 pipeline_kwargs=dict(
-                    max_new_tokens=max_new_tokens,
                     repetition_penalty=1.0,
                 ),
             )            

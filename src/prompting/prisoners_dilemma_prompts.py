@@ -44,11 +44,16 @@ You are competing to win the most points in this game. Your goal is not to ensur
 - Once messages are exchanged, you must **choose your action (Cooperate or Defect)**, knowing that they may or may not follow their message.'''
 
 game_prompt_PD = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**
+## Instructions:
 Each round, you and the other player must each choose to **cooperate** or **defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
 - You have access to the game history above.
 - You will only see the other player's message after you've sent yours, same for the action.
 - Once messages are exchanged, you must choose if you want to cooperate or defect.
-
+## Outcomes:
+- **Both cooperate**: both players get 3 point.
+- **One defects**: The defector gets 5 points, the cooperator gets 0.
+- **Both DEFECT**: both players get 1 points.
+## Notes:
 - You are competing to win the most points in this game. Your goal is not to ensure fairness or cooperation but to get the highest possible reward for yourself.
 - You can change your strategy at any time'''
 
@@ -64,7 +69,6 @@ You are competing to win the most points in this game. Your goal is not necessar
 
 
 def get_game_description_prompt(game_name) -> SystemMessage:
-    print(game_name)
     game_description = ""
     if game_name == "prisoners_dilemma":
         game_description = game_prompt_PD
