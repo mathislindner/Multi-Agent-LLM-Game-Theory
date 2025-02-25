@@ -6,3 +6,4 @@ data/models/*
 data/*/__pycache__/*
 sbatch_out/
 src/data/outputs/*
+*.pyc
