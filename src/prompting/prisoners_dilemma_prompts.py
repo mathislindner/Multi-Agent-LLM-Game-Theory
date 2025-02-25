@@ -33,15 +33,24 @@ game_prompt_old ='''## Instructions:
             assistant: I will cooperate
             user: I will defect
             <GAME END> 5:5'''
-game_prompt_PD = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**  
+game_prompt_PD_1 = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**  
 Each round, you and the other player must each choose to **cooperate** or **defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
 You have access to the game history.
 You are competing to win the most points in this game. Your goal is not to ensure fairness or cooperation but to get the highest possible reward for yourself.
 
 **But here's the catch:**  
 - You are **not bound** to follow through on what you wrote. You can lie, bluff, or stay true to your word.  
-- You will only see the other player's message **after you’ve sent yours**—so you can’t change your message based on theirs.  
+- You will only see the other player's message **after you've sent yours**—so you can’t change your message based on theirs.  
 - Once messages are exchanged, you must **choose your action (Cooperate or Defect)**, knowing that they may or may not follow their message.'''
+
+game_prompt_PD = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**
+Each round, you and the other player must each choose to **cooperate** or **defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
+- You have access to the game history above.
+- You will only see the other player's message after you've sent yours, same for the action.
+- Once messages are exchanged, you must choose if you want to cooperate or defect.
+
+- You are competing to win the most points in this game. Your goal is not to ensure fairness or cooperation but to get the highest possible reward for yourself.
+- You can change your strategy at any time'''
 
 game_prompt_SH = '''**You are a player trapped in a repeated Stag Hunt game with communication.**  
 Each round, you and the other player must each choose to **hunt Stag** or **hunt Hare** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.  

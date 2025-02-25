@@ -8,6 +8,7 @@ import operator
 from src.models import get_model
 import json
 import pandas as pd
+from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
 from src.prompting.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
 # https://blog.langchain.dev/langgraph/
@@ -56,8 +57,15 @@ class PDState(TypedDict):
     agent_2_scores: Annotated[List[int], operator.add]
 
 def get_agent_annotated_prompt(agent_name: str, state: PDState, prompt_type: Literal["message", "action"]) -> AnnotatedPrompt:
+    '''Get the prompt for the agent based on the state of the game. The prompt includes the agent's personality, the game history, and a call to action or message.
+    Args:
+        agent_name (str): The name of the agent
+        state (PDState): The state of the game
+        prompt_type (Literal["message", "action"]): The type of prompt to generate
+    Returns:
+        AnnotatedPrompt: The prompt for the agent
+    '''
     prompt = []
-    prompt.append(state["game_description_prompt"])
     if agent_name == "agent_1":
         agent_prompt = get_personality_from_key_prompt(state["personality_key_1"])
     else:
@@ -65,6 +73,7 @@ def get_agent_annotated_prompt(agent_name: str, state: PDState, prompt_type: Lit
     prompt.append(agent_prompt)
     history = get_game_history_as_messages_prompt(agent_name, state, prompt_type)
     prompt.extend(history)
+    prompt.append(state["game_description_prompt"])
     if prompt_type == "message":
         prompt.append(get_call_for_message())
     else:
@@ -85,6 +94,9 @@ def invoke_from_prompt_state_node(model, ActionResponse):
         prompt_type = state.prompt_type
         Structure = MessageResponse if prompt_type == "message" else ActionResponse
         print("invoking model...")
+        print(f"prompt type: {prompt_type}")
+        print(f"agent name: {agent_name}")
+        print(f"prompt: {prompt}")
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
@@ -118,6 +130,7 @@ def should_continue(state: PDState) -> bool:
 def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str) -> PDState:
     # get models
     model = get_model(model_name)
+    callback_handler = OpenAICallbackHandler()
     if game_name == "prisoners_dilemma":
         ActionResponse = PDActionResponse
     elif game_name == "stag_hunt":
@@ -169,10 +182,15 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
         current_round=1,
         total_rounds=total_rounds
     )
-    end_state = compiled_graph.invoke(initial_state, config={"recursion_limit": 200})
-    #save results in pd df 
-    df = pd.DataFrame(columns=["model_name", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds"])
-    df = df.append({
+    end_state = compiled_graph.invoke(initial_state, config={"recursion_limit": 200, "callbacks": [callback_handler]})
+    print(f"Total Tokens Used: {callback_handler.total_tokens}")
+    print(f"Total Cost (USD): ${callback_handler.total_cost}")
+    #save results in pd df
+    path_to_csv = "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250225.csv"
+    columns = ["model_name", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds", "total_tokens", "total_cost_USD"]
+
+    # Create a new row with the results
+    new_row = pd.DataFrame([{
         "model_name": model_name,
         "personality_1": personality_key_1,
         "personality_2": personality_key_2,
@@ -182,9 +200,15 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
         "agent_2_messages": end_state["agent_2_messages"],
         "agent_1_actions": end_state["agent_1_actions"],
         "agent_2_actions": end_state["agent_2_actions"],
-        "total_rounds": total_rounds
-    }, ignore_index=True)
-    # Save results to CSV
-    output_csv_path = "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250225.csv"
-    df.to_csv(output_csv_path, mode='a', header=False, index=False)
+        "total_rounds": total_rounds,
+        "total_tokens": callback_handler.total_tokens,
+        "total_cost_USD": callback_handler.total_cost
+    }])
+
+    try:
+        df = pd.read_csv(path_to_csv)
+    except FileNotFoundError:
+        df = pd.DataFrame(columns=columns)
+    df = pd.concat([df, new_row], ignore_index=True)
+    df.to_csv(path_to_csv, mode='w', header=True, index=False)
     return end_state
