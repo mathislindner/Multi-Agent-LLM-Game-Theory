@@ -5,11 +5,11 @@ nr_of_rounds=7
 model_id="gpt-4o-mini"
 game_name="prisoners_dilemma"
 
-total_iterations=$(((${#personas[@]} * (${#personas[@]} - 1)) / 2))
+total_iterations=$((${#personas[@]} * ${#personas[@]}))
 current_iteration=0
 
 for i in "${!personas[@]}"; do
-    for j in $(seq $((i + 1)) $((${#personas[@]} - 1))); do
+    for j in "${!personas[@]}"; do
         agent_1="${personas[$i]}"
         agent_2="${personas[$j]}"
         current_iteration=$((current_iteration + 1))
