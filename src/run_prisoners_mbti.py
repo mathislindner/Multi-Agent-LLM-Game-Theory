@@ -1,21 +1,18 @@
 
-from langgraph.graph import StateGraph, MessagesState, START, END
+from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langgraph.types import Command, Send
 from typing import TypedDict, List, Annotated, Literal, Union
 from pydantic import BaseModel
 import operator
 from src.models import get_model
-from langchain_core.tools import tool
-from langchain_core.runnables import RunnableLambda
 import json
+import pandas as pd
 
 from src.prompting.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
-#inherites from MessagesState but we added better structured output for better readability
-#messages: List[Dict[str, str]] = [] https://dev.to/jamesli/advanced-langgraph-implementing-conditional-edges-and-tool-calling-agents-3pdn
 
 class AnnotatedPrompt(BaseModel):
     agent_name: str
@@ -26,7 +23,6 @@ class LLMReply(BaseModel):
     agent_name: str
     reply_type: Literal["message", "action"]
     message: str
-    
 
 #These are for the models structured output
 class PDActionResponse(BaseModel):
@@ -48,6 +44,8 @@ class PDState(TypedDict):
     """
     game_description_prompt: str
     total_rounds: int
+    current_round: int
+    
     personality_key_1: str
     personality_key_2: str
     agent_1_messages: Annotated[List[str], operator.add]
@@ -56,49 +54,29 @@ class PDState(TypedDict):
     agent_2_messages: Annotated[List[str], operator.add]
     agent_2_actions: Annotated[List[str], operator.add]
     agent_2_scores: Annotated[List[int], operator.add]
-    
-    current_round: int
-    
-    #current_message_responses: Annotated[list, operator.add]
-    #current_action_responses: Annotated[list, operator.add]
-    
-def get_agent_message_annotated_prompt(agent_name: str, state: PDState) -> AnnotatedPrompt:
-    message_prompt = []
-    message_prompt.append(state["game_description_prompt"])
-    if agent_name == "agent_1":
-        agent_prompt = get_personality_from_key_prompt(state["personality_key_1"]) #TODO could rename key to easily access it without if
-    else:
-        agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
-    message_prompt.append(agent_prompt)
-    message_history = get_game_history_as_messages_prompt(agent_name, state, "message")
-    message_prompt.extend(message_history)
-    message_prompt.append(get_call_for_message())
-    return AnnotatedPrompt(agent_name=agent_name, prompt_type="message", prompt=message_prompt)
 
-def get_agent_action_annotated_prompt(agent_name: str, state: PDState) -> AnnotatedPrompt:
-    action_prompt = []
-    action_prompt.append(state["game_description_prompt"])
+def get_agent_annotated_prompt(agent_name: str, state: PDState, prompt_type: Literal["message", "action"]) -> AnnotatedPrompt:
+    prompt = []
+    prompt.append(state["game_description_prompt"])
     if agent_name == "agent_1":
         agent_prompt = get_personality_from_key_prompt(state["personality_key_1"])
     else:
         agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
-    action_prompt.append(agent_prompt)
-    action_history = get_game_history_as_messages_prompt(agent_name, state, "action")
-    action_prompt.extend(action_history)
-    action_prompt.append(get_call_for_action())
-    return AnnotatedPrompt(agent_name=agent_name, prompt_type="action", prompt=action_prompt)
+    prompt.append(agent_prompt)
+    history = get_game_history_as_messages_prompt(agent_name, state, prompt_type)
+    prompt.extend(history)
+    if prompt_type == "message":
+        prompt.append(get_call_for_message())
+    else:
+        prompt.append(get_call_for_action())
+    return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
 
-def send_messages_prompts(state: PDState):
-    agent_1_annotated_prompt_state = get_agent_message_annotated_prompt("agent_1", state)
-    agent_2_annotated_prompt_state = get_agent_message_annotated_prompt("agent_2", state)
-    # this should send directly to invoke from state prompt
-    return [Send("invoke_from_prompt_state_message", agent_1_annotated_prompt_state), Send("invoke_from_prompt_state_message", agent_2_annotated_prompt_state)]
-    #return {"current_message_prompts" : [agent_1_annotated_prompt_state, agent_2_annotated_prompt_state]}
-
-def send_actions_prompts(state: PDState):
-    agent_1_annotated_prompt_state = get_agent_action_annotated_prompt("agent_1", state)
-    agent_2_annotated_prompt_state = get_agent_action_annotated_prompt("agent_2", state)
-    return [Send("invoke_from_prompt_state_action", agent_1_annotated_prompt_state), Send("invoke_from_prompt_state_action", agent_2_annotated_prompt_state)]
+def send_prompts_node(prompt_type = Literal["message", "action"]):
+    def send_prompts(state: PDState):
+        agent_1_annotated_prompt_state = get_agent_annotated_prompt("agent_1", state, prompt_type)
+        agent_2_annotated_prompt_state = get_agent_annotated_prompt("agent_2", state, prompt_type)
+        return [Send(f"invoke_from_prompt_state_{prompt_type}", agent_1_annotated_prompt_state), Send(f"invoke_from_prompt_state_{prompt_type}", agent_2_annotated_prompt_state)]
+    return send_prompts
 
 def invoke_from_prompt_state_node(model, ActionResponse):
     def invoke_from_prompt_state(state : AnnotatedPrompt):
@@ -136,18 +114,6 @@ def update_state_node(game_name: str):
 def should_continue(state: PDState) -> bool:
     print("current round: ", state["current_round"])
     return (state["current_round"] <= state["total_rounds"])
-    
-def test1(state: PDState) -> dict:
-    return {}
-    
-def test2(state: PDState) -> dict:
-    return {}
-
-def test3(state: PDState) -> dict:
-    return {}
-
-def test4(state: PDState) -> dict:
-    return {}
 
 def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str) -> PDState:
     # get models
@@ -159,26 +125,25 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #create graph
     graph = StateGraph(PDState, input = PDState, output = PDState)
     #add nodes
-    graph.add_node("lambda_to_messages", test1)
-    graph.add_node("lambda_from_messages", test2)
-    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model, ActionResponse)) #doing this because else we fall into a weird recursion state
+    graph.add_node("lambda_to_messages", lambda x: {})
+    graph.add_node("lambda_from_messages", lambda x: {})
+    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model, ActionResponse))
     graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model, ActionResponse))
-    graph.add_node(f"lambda_to_actions", test3)
-    graph.add_node("lambda_from_actions", test4)
+    graph.add_node(f"lambda_to_actions", lambda x: {})
+    graph.add_node("lambda_from_actions", lambda x: {})
     graph.add_node("update_state", update_state_node(game_name))
     
     #add edges
     graph.add_edge(START, "lambda_to_messages")
     graph.add_conditional_edges(
         source = "lambda_to_messages", 
-        path = send_messages_prompts,
+        path = send_prompts_node("message"),
         path_map = ["invoke_from_prompt_state_message"]
         )
     graph.add_edge("invoke_from_prompt_state_message","lambda_from_messages")
-    #graph.add_edge("gather_messages", "generate_actions_prompts")
     graph.add_conditional_edges(
         source = "lambda_from_messages", 
-        path = send_actions_prompts,
+        path = send_prompts_node("action"),
         path_map = ["invoke_from_prompt_state_action"]
         )
     graph.add_edge("invoke_from_prompt_state_action","lambda_from_actions")
@@ -205,4 +170,21 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
         total_rounds=total_rounds
     )
     end_state = compiled_graph.invoke(initial_state, config={"recursion_limit": 200})
+    #save results in pd df 
+    df = pd.DataFrame(columns=["model_name", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds"])
+    df = df.append({
+        "model_name": model_name,
+        "personality_1": personality_key_1,
+        "personality_2": personality_key_2,
+        "agent_1_scores": end_state["agent_1_scores"],
+        "agent_2_scores": end_state["agent_2_scores"],
+        "agent_1_messages": end_state["agent_1_messages"],
+        "agent_2_messages": end_state["agent_2_messages"],
+        "agent_1_actions": end_state["agent_1_actions"],
+        "agent_2_actions": end_state["agent_2_actions"],
+        "total_rounds": total_rounds
+    }, ignore_index=True)
+    # Save results to CSV
+    output_csv_path = "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250225.csv"
+    df.to_csv(output_csv_path, mode='a', header=False, index=False)
     return end_state
