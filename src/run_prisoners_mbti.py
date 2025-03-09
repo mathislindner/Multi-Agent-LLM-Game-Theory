@@ -11,6 +11,7 @@ import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
 from src.prompting.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
+import re
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
@@ -93,10 +94,6 @@ def invoke_from_prompt_state_node(model, ActionResponse):
         agent_name = state.agent_name
         prompt_type = state.prompt_type
         Structure = MessageResponse if prompt_type == "message" else ActionResponse
-        #print("invoking model...")
-        #print(f"prompt type: {prompt_type}")
-        #print(f"agent name: {agent_name}")
-        #print(f"prompt: {prompt}")
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
@@ -184,9 +181,17 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     end_state = compiled_graph.invoke(initial_state, config={"recursion_limit": 200, "callbacks": [callback_handler]})
     print(f"Total Cost (USD): ${callback_handler.total_cost}")
     #save results in pd df
-    path_to_csv = "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250225.csv"
+    path_to_csv = "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250309.csv"
     columns = ["model_name", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds", "total_tokens", "total_cost_USD"]
 
+    #fix the messages and actions by removing quotes or double quotes if there are any at the start or end with regex
+    def clean_text(text):
+        return re.sub(r'^[\'"]|[\'"]$', '', text)
+
+    end_state["agent_1_messages"] = [clean_text(msg) for msg in end_state["agent_1_messages"]]
+    end_state["agent_2_messages"] = [clean_text(msg) for msg in end_state["agent_2_messages"]]
+    end_state["agent_1_actions"] = [clean_text(action) for action in end_state["agent_1_actions"]]
+    end_state["agent_2_actions"] = [clean_text(action) for action in end_state["agent_2_actions"]]
     # Create a new row with the results
     new_row = pd.DataFrame([{
         "model_name": model_name,
