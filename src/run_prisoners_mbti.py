@@ -16,6 +16,10 @@ import re
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
 
+#fix the messages and actions by removing quotes or double quotes if there are any at the start or end with regex
+def clean_text(text):
+    return re.sub(r'^[\'"]|[\'"]$', '', text)
+
 class AnnotatedPrompt(BaseModel):
     agent_name: str
     prompt_type: Literal["message", "action"]
@@ -96,6 +100,7 @@ def invoke_from_prompt_state_node(model, ActionResponse):
         Structure = MessageResponse if prompt_type == "message" else ActionResponse
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
+        message = clean_text(message)
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 
@@ -183,10 +188,6 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #save results in pd df
     path_to_csv = "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250309.csv"
     columns = ["model_name", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds", "total_tokens", "total_cost_USD"]
-
-    #fix the messages and actions by removing quotes or double quotes if there are any at the start or end with regex
-    def clean_text(text):
-        return re.sub(r'^[\'"]|[\'"]$', '', text)
 
     end_state["agent_1_messages"] = [clean_text(msg) for msg in end_state["agent_1_messages"]]
     end_state["agent_2_messages"] = [clean_text(msg) for msg in end_state["agent_2_messages"]]
