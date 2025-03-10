@@ -4,12 +4,13 @@ from typing import Literal
 from models import get_model
 from tqdm import tqdm
 from langchain.prompts import PromptTemplate
+
+"""
 import ast
 import re
 import csv
-
 def clean_list_column(value):
-    """Fixes improperly formatted lists with inconsistent quotes."""
+    '''Fixes improperly formatted lists with inconsistent quotes.'''
     if not (isinstance(value, str) and value.startswith('[') and value.endswith(']')):
         return value
 
@@ -61,13 +62,14 @@ def fix_csv(file_path, output_path):
     for col in list_columns:
         if col in df.columns:
             df[col] = df[col].apply(list_to_str)
+    df.to_csv(output_path, index=False, quoting=csv.QUOTE_MINIMAL)        
     return df
     # Write the cleaned CSV using QUOTE_MINIMAL to avoid extra quoting.
-    df.to_csv(output_path, index=False, quoting=csv.QUOTE_MINIMAL)
+"""
+csv_name = "250309"
+#df = fix_csv(f"/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_{csv_name}.csv", f"/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_{csv_name}_fixed.csv")
 
-df = fix_csv("/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250225.csv", "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250225_fixed.csv")
-
-
+df = pd.read_csv(f"/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_{csv_name}.csv")
 ############
 
 # Convert string representations of lists to actual lists
@@ -85,7 +87,6 @@ df["truthful_agent_2"] = [[] for _ in range(len(df))]
 df["analysis_agent_1"] = [[] for _ in range(len(df))]
 df["analysis_agent_2"] = [[] for _ in range(len(df))]
 model = get_model("gpt-4o-mini")
-#TODO add both previous action to prompt, since sometimes it s difficult to guess what they mean without context.
 question = """You have to assess the intent of the person using the message that will be given. To do that, first, do a one sentence analysis of the message, if it seems like the person is looking to cooperate or defect. cooperation will usually about common goals and defection about selfishness"""
 judge_prompt = PromptTemplate(
     input_variables = ["question", "current_message"],
@@ -133,5 +134,5 @@ for index, row in df.iterrows():
         else:
             df.at[index, "truthful_agent_2"].append(row["intent_agent_2"][i] == "defect")
             
-df.to_csv("/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250225_solved_1.csv")
+df.to_csv(f"/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_{csv_name}_solved.csv")
         
