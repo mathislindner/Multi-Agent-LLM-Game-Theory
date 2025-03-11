@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import operator
 from src.models import get_model
 import json
+import csv
 import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
@@ -15,9 +16,28 @@ import re
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
 
-#fix the messages and actions by removing quotes or double quotes if there are any at the start or end with regex
+# Fix the messages and actions by removing quotes or double quotes if they are at the start or end with regex
+import re
+
+import re
+import unicodedata
+
 def clean_text(text):
-    return re.sub(r'^[\'"]|[\'"]$', '', text)
+    # Normalize unicode characters (e.g., convert curly quotes to straight quotes)
+    text = unicodedata.normalize("NFKC", text)
+    
+    # Standardize contractions (optional, only needed if inconsistency exists)
+    text = text.replace("\"", "'")  # Convert curly apostrophes to straight
+    
+    # Normalize whitespace
+    text = re.sub(r"\s+", " ", text).strip()
+    
+    # Standardize punctuation spacing (e.g., ensure spacing after semicolons)
+    text = re.sub(r"\s*([;,.!?])\s*", r" \1 ", text)
+    
+    return text
+
+
 
 class AnnotatedPrompt(BaseModel):
     agent_name: str
@@ -99,7 +119,6 @@ def invoke_from_prompt_state_node(model, ActionResponse):
         Structure = MessageResponse if prompt_type == "message" else ActionResponse
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
-        message = clean_text(message)
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 
@@ -193,10 +212,10 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     path_to_csv = file_path
     columns = ["model_name", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds", "total_tokens", "total_cost_USD"]
 
-    end_state["agent_1_messages"] = [clean_text(msg) for msg in end_state["agent_1_messages"]]
-    end_state["agent_2_messages"] = [clean_text(msg) for msg in end_state["agent_2_messages"]]
-    end_state["agent_1_actions"] = [clean_text(action) for action in end_state["agent_1_actions"]]
-    end_state["agent_2_actions"] = [clean_text(action) for action in end_state["agent_2_actions"]]
+    end_state["agent_1_messages"] = [msg.replace('"', "'") for msg in end_state["agent_1_messages"]]
+    end_state["agent_2_messages"] = [msg.replace('"', "'") for msg in end_state["agent_2_messages"]]
+    end_state["agent_1_actions"] = [action.replace('"', "'") for action in end_state["agent_1_actions"]]
+    end_state["agent_2_actions"] = [action.replace('"', "'") for action in end_state["agent_2_actions"]]
     # Create a new row with the results
     new_row = pd.DataFrame([{
         "model_name": model_name,

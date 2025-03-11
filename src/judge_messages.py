@@ -1,9 +1,10 @@
 import pandas as pd
 from pydantic import BaseModel
 from typing import Literal
-from src.models import get_model
+from models import get_model
 from tqdm import tqdm
 from langchain.prompts import PromptTemplate
+import os
 class AnswerFormat(BaseModel):
     analysis: str
     answer: Literal["cooperate", "defect"]
@@ -69,3 +70,14 @@ def judge_message_intent(file_path_in: str, file_path_out: str, model_name: str)
                 
     df.to_csv(file_path_out, index=False)
             
+if __name__ == "__main__":
+    input_dir = "src/data/outputs"
+    input_files = [f for f in os.listdir(input_dir) if f.endswith(".csv") and not f.endswith("_solved.csv")]
+    solved_files = [f for f in os.listdir(input_dir) if f.endswith("_solved.csv")]
+    input_files = [f for f in input_files if f.replace(".csv", "_solved.csv") not in solved_files]
+    output_files = [f.replace(".csv", "_solved.csv") for f in input_files]
+    
+    for input_file, output_file in zip(input_files, output_files):
+        input_path = os.path.join(input_dir, input_file)
+        output_path = os.path.join(input_dir, output_file)
+        judge_message_intent(input_path, output_path, "your_model_name")
