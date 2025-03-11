@@ -10,10 +10,6 @@ def main(model_id, rounds, agent_1_persona, agent_2_persona, game_name):
     output_dir = "src/data/outputs/"
     base_game_state_path = f"{output_dir}{game_name}_{date_string}"
     game_state_path = f"{base_game_state_path}_0.csv"
-    n = 1
-    while os.path.exists(game_state_path):
-        game_state_path = f"{base_game_state_path}_{n}.csv"
-        n += 1
     game_state = run_n_rounds_w_com(model_name = model_id, total_rounds = rounds, personality_key_1 = agent_1_persona, personality_key_2 = agent_2_persona, game_name = game_name, file_path = game_state_path)
     
     return
