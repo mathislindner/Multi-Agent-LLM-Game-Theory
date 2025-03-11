@@ -33,6 +33,7 @@ game_prompt_old ='''## Instructions:
             assistant: I will cooperate
             user: I will defect
             <GAME END> 5:5'''
+            
 game_prompt_PD_1 = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**  
 Each round, you and the other player must each choose to **cooperate** or **defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
 You have access to the game history.
@@ -42,6 +43,19 @@ You are competing to win the most points in this game. Your goal is not to ensur
 - You are **not bound** to follow through on what you wrote. You can lie, bluff, or stay true to your word.  
 - You will only see the other player's message **after you've sent yours**—so you can’t change your message based on theirs.  
 - Once messages are exchanged, you must **choose your action (Cooperate or Defect)**, knowing that they may or may not follow their message.'''
+
+game_prompt_generic = '''**You are a player in a repeated game with communication.**
+## Instructions:
+Each round, you and the other player must each choose to **cooperate** or **defect** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
+You have access to the game history.
+You are competing to win the most points in this game. Your goal is not necessarily fairness or cooperation, but to maximize your own reward.
+## Outcomes:
+- **Both cooperate**: both players get 3 point.
+- **One defects**: The defector gets 5 points, the cooperator gets 0.
+- **Both DEFECT**: both players get 1 points.
+## Notes:
+- You are competing to win the most points in this game. Your goal is not to ensure fairness or cooperation but to get the highest possible reward for yourself.
+- You can change your strategy at any time'''
 
 game_prompt_PD = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**
 ## Instructions:
@@ -57,11 +71,16 @@ Each round, you and the other player must each choose to **cooperate** or **defe
 - You are competing to win the most points in this game. Your goal is not to ensure fairness or cooperation but to get the highest possible reward for yourself.
 - You can change your strategy at any time'''
 
-game_prompt_SH = '''**You are a player trapped in a repeated Stag Hunt game with communication.**  
+game_prompt_SH = '''**You are a player in a repeated Stag Hunt game with communication.**  
+## Instructions:
 Each round, you and the other player must each choose to **hunt Stag** or **hunt Hare** without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.  
 You have access to the game history.  
 You are competing to win the most points in this game. Your goal is not necessarily fairness or cooperation, but to maximize your own reward.  
-
+## Outcomes:
+- **Both cooperate**: both players get 3 point.
+- **One defects**: The defector gets 5 points, the cooperator gets 0.
+- **Both DEFECT**: both players get 1 points.
+## Notes:
 **But here's the catch:**  
 - You are **not bound** to follow through on what you wrote. You can lie, bluff, or stay true to your word.  
 - You will only see the other player's message **after you’ve sent yours**—so you can’t change your message based on theirs.  
@@ -74,6 +93,8 @@ def get_game_description_prompt(game_name) -> SystemMessage:
         game_description = game_prompt_PD
     elif game_name == "stag_hunt":
         game_description = game_prompt_SH
+    elif game_name == "generic":
+        game_description = game_prompt_generic
     else:
         raise ValueError("game_name must be 'prisoners_dilemma' or 'stag_hunt'")
         
@@ -91,8 +112,6 @@ def get_personality_from_key_prompt(personality_key:str) -> SystemMessage:
     return SystemMessage(personalities[personality_key])
 
 def get_game_history_as_messages_prompt(current_agent, state, history_type: str):
-    #TODO add this to game state for each agent, this becomes to much computation for no reason to rewrite everytime.
-    #TODO: make sure to check if the last actions exist: if not we do not want to access them.
     #set variables from state (agent_1_messages, agent_1_actions, agent_2_messages, agent_2_actions, agent_1_scores, agent_2_scores, current_round)
     '''return the history as a list of human and assistant messages (current agent is assistant, the other is human)'''
     if history_type not in ["message", "action"]:

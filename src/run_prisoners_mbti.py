@@ -9,7 +9,7 @@ import json
 import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
-from src.prompting.prisoners_dilemma_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
+from src.prompting.game_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
 import re
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
@@ -42,7 +42,7 @@ class MessageResponse(BaseModel):
     """Respond with a sentence to send to the other agent."""
     message: str
     
-class PDState(TypedDict):
+class GameState(TypedDict):
     """State for prisonner's dilemma game, includes actions taken and messages exchanged by agents.
     Args:
         TypedDict ([type]): [description]
@@ -60,11 +60,11 @@ class PDState(TypedDict):
     agent_2_actions: Annotated[List[str], operator.add]
     agent_2_scores: Annotated[List[int], operator.add]
 
-def get_agent_annotated_prompt(agent_name: str, state: PDState, prompt_type: Literal["message", "action"]) -> AnnotatedPrompt:
+def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: Literal["message", "action"]) -> AnnotatedPrompt:
     '''Get the prompt for the agent based on the state of the game. The prompt includes the agent's personality, the game history, and a call to action or message.
     Args:
         agent_name (str): The name of the agent
-        state (PDState): The state of the game
+        state (GameState): The state of the game
         prompt_type (Literal["message", "action"]): The type of prompt to generate
     Returns:
         AnnotatedPrompt: The prompt for the agent
@@ -85,7 +85,7 @@ def get_agent_annotated_prompt(agent_name: str, state: PDState, prompt_type: Lit
     return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
 
 def send_prompts_node(prompt_type = Literal["message", "action"]):
-    def send_prompts(state: PDState):
+    def send_prompts(state: GameState):
         agent_1_annotated_prompt_state = get_agent_annotated_prompt("agent_1", state, prompt_type)
         agent_2_annotated_prompt_state = get_agent_annotated_prompt("agent_2", state, prompt_type)
         return [Send(f"invoke_from_prompt_state_{prompt_type}", agent_1_annotated_prompt_state), Send(f"invoke_from_prompt_state_{prompt_type}", agent_2_annotated_prompt_state)]
@@ -104,7 +104,7 @@ def invoke_from_prompt_state_node(model, ActionResponse):
     return invoke_from_prompt_state
 
 def update_state_node(game_name: str):
-    def update_state(state: PDState) -> PDState:
+    def update_state(state: GameState) -> GameState:
         state_updates = {}
         payoff_matrix = {}
         with (open("/cluster/home/mlindner/Github/master_thesis_project/src/prompting/payoff_matrices.json")) as f:
@@ -124,10 +124,10 @@ def update_state_node(game_name: str):
         return Command(update = state_updates)
     return update_state
 
-def should_continue(state: PDState) -> bool:
+def should_continue(state: GameState) -> bool:
     return (state["current_round"] <= state["total_rounds"])
 
-def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str, file_path: str) -> PDState:
+def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str, file_path: str) -> GameState:
     # get models
     model = get_model(model_name)
     callback_handler = OpenAICallbackHandler()
@@ -135,8 +135,13 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
         ActionResponse = PDActionResponse
     elif game_name == "stag_hunt":
         ActionResponse = SHActionResponse
+    elif game_name == "generic":
+        ActionResponse = PDActionResponse
+    else:
+        raise ValueError("Action response not defined!")
+        
     #create graph
-    graph = StateGraph(PDState, input = PDState, output = PDState)
+    graph = StateGraph(GameState, input = GameState, output = GameState)
     #add nodes
     graph.add_node("lambda_to_messages", lambda x: {})
     graph.add_node("lambda_from_messages", lambda x: {})
@@ -175,7 +180,7 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #print(compiled_graph.get_graph().draw_mermaid())
     #create initial state
     game_description_prompt = get_game_description_prompt(game_name) #get from data.prompts #say how many total rounds will be played
-    initial_state = PDState(
+    initial_state = GameState(
         game_description_prompt=game_description_prompt,
         personality_key_1=personality_key_1,
         personality_key_2=personality_key_2,

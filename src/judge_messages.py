@@ -1,7 +1,7 @@
 import pandas as pd
 from pydantic import BaseModel
 from typing import Literal
-from models import get_model
+from src.models import get_model
 from tqdm import tqdm
 from langchain.prompts import PromptTemplate
 class AnswerFormat(BaseModel):
