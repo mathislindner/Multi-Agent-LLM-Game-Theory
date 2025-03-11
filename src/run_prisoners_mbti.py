@@ -1,4 +1,3 @@
-
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langgraph.types import Command, Send
@@ -128,7 +127,7 @@ def update_state_node(game_name: str):
 def should_continue(state: PDState) -> bool:
     return (state["current_round"] <= state["total_rounds"])
 
-def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str) -> PDState:
+def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str, file_path: str) -> PDState:
     # get models
     model = get_model(model_name)
     callback_handler = OpenAICallbackHandler()
@@ -186,7 +185,7 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     end_state = compiled_graph.invoke(initial_state, config={"recursion_limit": 200, "callbacks": [callback_handler]})
     print(f"Total Cost (USD): ${callback_handler.total_cost}")
     #save results in pd df
-    path_to_csv = "/cluster/home/mlindner/Github/master_thesis_project/src/data/outputs/experiment_250309.csv"
+    path_to_csv = file_path
     columns = ["model_name", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds", "total_tokens", "total_cost_USD"]
 
     end_state["agent_1_messages"] = [clean_text(msg) for msg in end_state["agent_1_messages"]]
