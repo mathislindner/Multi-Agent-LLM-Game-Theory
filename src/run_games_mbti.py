@@ -10,61 +10,31 @@ import csv
 import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
-from src.prompting.game_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
-import re
-import unicodedata
+from prompting.personality_prompts import get_personality_from_key_prompt
+from src.games_structures.base_game import BaseGameStructure, GameState, AnnotatedPrompt, get_game_history
+
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
 
 
-def clean_text(text):
-    # Normalize unicode characters (e.g., convert curly quotes to straight quotes)
-    text = unicodedata.normalize("NFKC", text)
-    
-    # Standardize contractions (optional, only needed if inconsistency exists)
-    text = text.replace("\"", "'")  # Convert curly apostrophes to straight
-    
-    # Normalize whitespace
-    text = re.sub(r"\s+", " ", text).strip()
-    
-    # Standardize punctuation spacing (e.g., ensure spacing after semicolons)
-    text = re.sub(r"\s*([;,.!?])\s*", r" \1 ", text)
-    
-    return text
+def load_game_structure_from_registry(game_name: str) -> BaseGameStructure:
+    if game_name == "prisoners_dilemma":
+        from src.games_structures.prisonnersdilemma import PrisonersDilemmaGame
+        return PrisonersDilemmaGame()
+    elif game_name == "stag_hunt":
+        from src.games_structures.staghunt import StagHuntGame
+        return StagHuntGame()
+    elif game_name == "generic":
+        from src.games_structures.generic import GenericGame
+        return GenericGame()
+    elif game_name == "chicken":
+        from src.games_structures.chicken import ChickenGame
+        return ChickenGame()
+    else:
+        raise ValueError(f"Unknown game name: {game_name}")
 
-class AnnotatedPrompt(BaseModel):
-    agent_name: str
-    prompt_type: Literal["message", "action"]
-    prompt: List[Union[HumanMessage, SystemMessage, AIMessage]]
-
-#all of the games have messages, but different actions
-class MessageResponse(BaseModel):
-    """Respond with a sentence to send to the other agent."""
-    message: str
-    
-class GameState(TypedDict):
-    """State for the games, includes actions taken and messages exchanged by agents.
-    Args:
-        TypedDict ([type]): [description]
-    """
-    game_description_prompt: str
-    total_rounds: int
-    current_round: int
-    
-    personality_key_1: str 
-    model_name_1: str
-    agent_1_messages: Annotated[List[str], operator.add]
-    agent_1_actions: Annotated[List[str], operator.add]
-    agent_1_scores: Annotated[List[int], operator.add]
-    
-    personality_key_2: str
-    model_name_2: str
-    agent_2_messages: Annotated[List[str], operator.add]
-    agent_2_actions: Annotated[List[str], operator.add]
-    agent_2_scores: Annotated[List[int], operator.add]
-
-def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: Literal["message", "action"]) -> AnnotatedPrompt:
+def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: Literal["message", "action"], GameStructure: BaseGameStructure) -> AnnotatedPrompt:
     '''Get the prompt for the agent based on the state of the game. The prompt includes the agent's personality, the game history, and a call to action or message.
     Args:
         agent_name (str): The name of the agent
@@ -79,44 +49,45 @@ def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: L
     else:
         agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
     prompt.append(agent_prompt)
-    history = get_game_history_as_messages_prompt(agent_name, state, prompt_type)
+    history = get_game_history(agent_name, state, prompt_type)
     prompt.extend(history)
-    prompt.append(state["game_description_prompt"])
+    prompt.append(GameStructure.GAME_PROMPT)
     if prompt_type == "message":
-        prompt.append(get_call_for_message())
+        prompt.append(GameStructure.coerce_message())
     else:
-        prompt.append(get_call_for_action())
+        prompt.append(GameStructure.coerce_action())
     return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
 
-def send_prompts_node(prompt_type = Literal["message", "action"]):
+def send_prompts_node(prompt_type : Literal["message", "action"], GameStructure: BaseGameStructure):
     def send_prompts(state: GameState):
-        agent_1_annotated_prompt_state = get_agent_annotated_prompt("agent_1", state, prompt_type)
-        agent_2_annotated_prompt_state = get_agent_annotated_prompt("agent_2", state, prompt_type)
+        agent_1_annotated_prompt_state = get_agent_annotated_prompt("agent_1", state, prompt_type, GameStructure)
+        agent_2_annotated_prompt_state = get_agent_annotated_prompt("agent_2", state, prompt_type, GameStructure)
         return [Send(f"invoke_from_prompt_state_{prompt_type}", agent_1_annotated_prompt_state), Send(f"invoke_from_prompt_state_{prompt_type}", agent_2_annotated_prompt_state)]
     return send_prompts
 
-def invoke_from_prompt_state_node(model, ActionResponse):
+def invoke_from_prompt_state_node(model, GameStructure):
     def invoke_from_prompt_state(state : AnnotatedPrompt):
         prompt = state.prompt
         agent_name = state.agent_name
         prompt_type = state.prompt_type
-        Structure = MessageResponse if prompt_type == "message" else ActionResponse
+        Structure = GameStructure.MessageResponse if prompt_type == "message" else GameStructure.ActionResponse
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 
-def update_state_node(game_name: str):
-    def update_state(state: GameState) -> GameState:
+def update_state_node(GameStructure):
+    def update_state(state: GameState) -> Command:
         state_updates = {}
+        '''
         payoff_matrix = {}
         with (open("/cluster/home/mlindner/Github/master_thesis_project/src/prompting/payoff_matrices.json")) as f:
             payoff_matrix = json.load(f)[game_name]
-        
+        '''
         # update scores
         agent_1_decision = state["agent_1_actions"][-1]
         agent_2_decision = state["agent_2_actions"][-1]
-        score_agent1, score_agent2 = payoff_matrix[agent_1_decision][agent_2_decision]
+        score_agent1, score_agent2 = GameState.payoff_matrix[(agent_1_decision, agent_2_decision)]
         
         # add scores to scores
         state_updates["agent_1_scores"] = [score_agent1]
@@ -134,22 +105,16 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     # get models
     model = get_model(model_name)
     callback_handler = OpenAICallbackHandler()
-    if game_name == "prisoners_dilemma":
-        ActionResponse = PDActionResponse
-    elif game_name == "stag_hunt":
-        ActionResponse = SHActionResponse
-    elif game_name == "generic":
-        ActionResponse = PDActionResponse
-    else:
-        raise ValueError("Action response not defined!")
-        
+    
+    GameStructure = load_game_structure_from_registry(game_name) #game now includes the game prompt, the payoff matrix, the message response the action response formats
+    
     #create graph
     graph = StateGraph(GameState, input = GameState, output = GameState)
     #add nodes
     graph.add_node("lambda_to_messages", lambda x: {})
     graph.add_node("lambda_from_messages", lambda x: {})
-    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model, ActionResponse))
-    graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model, ActionResponse))
+    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model, GameStructure))
+    graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model, GameStructure))
     graph.add_node(f"lambda_to_actions", lambda x: {})
     graph.add_node("lambda_from_actions", lambda x: {})
     graph.add_node("update_state", update_state_node(game_name))
@@ -158,13 +123,13 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     graph.add_edge(START, "lambda_to_messages")
     graph.add_conditional_edges(
         source = "lambda_to_messages", 
-        path = send_prompts_node("message"),
+        path = send_prompts_node("message", GameStructure),
         path_map = ["invoke_from_prompt_state_message"]
         )
     graph.add_edge("invoke_from_prompt_state_message","lambda_from_messages")
     graph.add_conditional_edges(
         source = "lambda_from_messages", 
-        path = send_prompts_node("action"),
+        path = send_prompts_node("action", GameStructure),
         path_map = ["invoke_from_prompt_state_action"]
         )
     graph.add_edge("invoke_from_prompt_state_action","lambda_from_actions")
@@ -182,9 +147,7 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #print mermaid
     #print(compiled_graph.get_graph().draw_mermaid())
     #create initial state
-    game_description_prompt = get_game_description_prompt(game_name) #get from data.prompts #say how many total rounds will be played
     initial_state = GameState(
-        game_description_prompt=game_description_prompt,
         personality_key_1=personality_key_1,
         personality_key_2=personality_key_2,
         current_round=1,
