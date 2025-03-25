@@ -10,7 +10,7 @@ import csv
 import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
-from src.prompting.game_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
+from prompting.personality_prompts import get_personality_from_key_prompt, get_game_description_prompt, get_game_history_as_messages_prompt, get_call_for_action, get_call_for_message
 import re
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb

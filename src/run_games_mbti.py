@@ -1,12 +1,7 @@
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langgraph.types import Command, Send
-from typing import TypedDict, List, Annotated, Literal, Union
-from pydantic import BaseModel
-import operator
+from typing import Literal
 from src.models import get_model
-import json
-import csv
 import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
@@ -65,11 +60,12 @@ def send_prompts_node(prompt_type : Literal["message", "action"], GameStructure:
         return [Send(f"invoke_from_prompt_state_{prompt_type}", agent_1_annotated_prompt_state), Send(f"invoke_from_prompt_state_{prompt_type}", agent_2_annotated_prompt_state)]
     return send_prompts
 
-def invoke_from_prompt_state_node(model, GameStructure):
+def invoke_from_prompt_state_node(models, GameStructure):
     def invoke_from_prompt_state(state : AnnotatedPrompt):
         prompt = state.prompt
         agent_name = state.agent_name
         prompt_type = state.prompt_type
+        model = models[agent_name]
         Structure = GameStructure.MessageResponse if prompt_type == "message" else GameStructure.ActionResponse
         response = model.with_structured_output(Structure).invoke(prompt)
         message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
@@ -79,11 +75,6 @@ def invoke_from_prompt_state_node(model, GameStructure):
 def update_state_node(GameStructure):
     def update_state(state: GameState) -> Command:
         state_updates = {}
-        '''
-        payoff_matrix = {}
-        with (open("/cluster/home/mlindner/Github/master_thesis_project/src/prompting/payoff_matrices.json")) as f:
-            payoff_matrix = json.load(f)[game_name]
-        '''
         # update scores
         agent_1_decision = state["agent_1_actions"][-1]
         agent_2_decision = state["agent_2_actions"][-1]
@@ -101,10 +92,13 @@ def update_state_node(GameStructure):
 def should_continue(state: GameState) -> bool:
     return (state["current_round"] <= state["total_rounds"])
 
-def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str, file_path: str) -> GameState:
+def run_n_rounds_w_com(model_name_1: str, model_name_2: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str, file_path: str) -> GameState:
     # get models
-    model = get_model(model_name)
-    callback_handler = OpenAICallbackHandler()
+    models = {
+        "agent_1": get_model(model_name_1),
+        "agent_2": get_model(model_name_2)
+    }
+    callback_handler = OpenAICallbackHandler() #TODO verify that this does not throw errors if we don t use openai
     
     GameStructure = load_game_structure_from_registry(game_name) #game now includes the game prompt, the payoff matrix, the message response the action response formats
     
@@ -113,8 +107,8 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     #add nodes
     graph.add_node("lambda_to_messages", lambda x: {})
     graph.add_node("lambda_from_messages", lambda x: {})
-    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(model, GameStructure))
-    graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(model, GameStructure))
+    graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(models, GameStructure))
+    graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(models, GameStructure))
     graph.add_node(f"lambda_to_actions", lambda x: {})
     graph.add_node("lambda_from_actions", lambda x: {})
     graph.add_node("update_state", update_state_node(game_name))
@@ -157,7 +151,7 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     print(f"Total Cost (USD): ${callback_handler.total_cost}")
     #save results in pd df
     path_to_csv = file_path
-    columns = ["model_name", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds", "total_tokens", "total_cost_USD"]
+    columns = ["model_name_1", "model_name_2" "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds", "total_tokens", "total_cost_USD"]
 
     end_state["agent_1_messages"] = [msg.replace('"', "'") for msg in end_state["agent_1_messages"]]
     end_state["agent_2_messages"] = [msg.replace('"', "'") for msg in end_state["agent_2_messages"]]
@@ -166,7 +160,8 @@ def run_n_rounds_w_com(model_name: str, total_rounds: int, personality_key_1: st
     # Create a new row with the results
     #TODO add models as well
     new_row = pd.DataFrame([{
-        "model_name": model_name,
+        "model_name_1": model_name_1,
+        "model_name_2": model_name_2,
         "personality_1": personality_key_1,
         "personality_2": personality_key_2,
         "agent_1_scores": end_state["agent_1_scores"],

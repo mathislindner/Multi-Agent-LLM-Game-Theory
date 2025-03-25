@@ -1,7 +1,11 @@
 langchain
 langgraph
-torch
-python-dotenv
+
 langchain-openai
 langchain-huggingface
+langchain_anthropic
+langchain-mistral
+
+torch
 pandas
+python-dotenv
