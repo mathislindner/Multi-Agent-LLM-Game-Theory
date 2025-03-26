@@ -5,9 +5,33 @@ import os
 #TODO: use init chat model (can also infer provider from jsut model name)
 from langchain.chat_models import init_chat_model
 
+
 #https://python.langchain.com/docs/integrations/chat/
-#all these are possible models
+
+#set all env vars to have the same name automatically
 load_dotenv()
+for k, v in os.environ.items():
+    os.environ[k] = v
+#--------------------------------------------------------
+
+
+#-------------------------------------------------------
+def get_model_by_id_and_provider(model_id: str, provider: str = None):
+    properties = {
+        "temperature": 0,
+        "seed": 42,
+        "max_retries": 2
+    }
+    if provider is None:
+        return init_chat_model(
+            model_id,
+            **properties
+        )
+    return init_chat_model(
+        model_id,
+        provider=provider,
+        **properties
+    )
 #--------------------------------------------------------
 def get_model(model_name: str):
     #if name starts with gpt..
