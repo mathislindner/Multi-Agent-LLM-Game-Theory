@@ -26,8 +26,8 @@ class StagHuntGame(BaseGameStructure):
     """Structured class for the Stag Hunt game."""
     @property
     def game_name(self) -> str:
-        """Each game must have a name."""
         return "stag_hunt"
+    
     @property
     def ActionResponse(self):
         return StagHuntActionResponse

@@ -1,3 +1,7 @@
+from pydantic import BaseModel
+from typing import Literal
+from src.games_structures.base_game import BaseGameStructure
+from langchain_core.messages import SystemMessage
 
 game_prompt_chicken = '''**You are a player in a repeated Chicken game with communication.**
 ## Instructions:
@@ -19,6 +23,9 @@ class ChickenGameActionResponse(BaseModel):
 class ChickenGame(BaseGameStructure):
     """Structured class for the Chicken game."""
 
+    @property
+    def game_name(self):
+        return "chicken"
     @property
     def ActionResponse(self):
         return ChickenGameActionResponse

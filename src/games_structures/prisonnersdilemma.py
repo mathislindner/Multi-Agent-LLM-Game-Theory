@@ -1,7 +1,7 @@
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from typing import Literal
 from pydantic import BaseModel
-from games_structures.base_game import BaseGameStructure
+from typing import Literal
+from src.games_structures.base_game import BaseGameStructure
+from langchain_core.messages import SystemMessage
 
 
 game_description = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**
@@ -24,7 +24,10 @@ class PrisonersDilemmaActionResponse(BaseModel):
 
 class PrisonersDilemmaGame(BaseGameStructure):
     """Structured class for the Prisoner's Dilemma game."""
-
+    @property
+    def game_name(self):
+        return "prisoners_dilemma"
+    
     @property
     def ActionResponse(self):
         return PrisonersDilemmaActionResponse

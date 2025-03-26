@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Literal
-from games_structures.base_game import BaseGameStructure
+from src.games_structures.base_game import BaseGameStructure
 from langchain_core.messages import SystemMessage
 
 game_prompt_generic = '''**You are a player in a repeated game with communication.**
@@ -22,7 +22,10 @@ class GenericActionResponse(BaseModel):
 
 class GenericGame(BaseGameStructure):
     """Structured class for a generic repeated game with communication."""
-
+    @property
+    def game_name(self):
+        return "generic"
+    
     @property
     def ActionResponse(self):
         return GenericActionResponse
