@@ -18,7 +18,7 @@ def load_game_structure_from_registry(game_name: str) -> BaseGameStructure:
         from src.games_structures.prisonnersdilemma import PrisonersDilemmaGame
         return PrisonersDilemmaGame()
     elif game_name == "stag_hunt":
-        from src.games_structures.staghunt import StagHuntGame
+        from src.games_structures.staghunt import StagHuntGame #TODO: FAILED ModuleNotFoundError: No module named 'games_structures
         return StagHuntGame()
     elif game_name == "generic":
         from src.games_structures.generic import GenericGame
@@ -26,6 +26,15 @@ def load_game_structure_from_registry(game_name: str) -> BaseGameStructure:
     elif game_name == "chicken":
         from src.games_structures.chicken import ChickenGame
         return ChickenGame()
+    elif game_name == "coordination":
+        from src.games_structures.coordination import CoordinationGame
+        return CoordinationGame()
+    elif game_name == "hawk_dove":
+        from src.games_structures.hawk_dove import HawkDoveGame
+        return HawkDoveGame()
+    elif game_name == "deadlock":
+        from src.games_structures.deadlock import DeadlockGame
+        return DeadlockGame()
     else:
         raise ValueError(f"Unknown game name: {game_name}")
 
