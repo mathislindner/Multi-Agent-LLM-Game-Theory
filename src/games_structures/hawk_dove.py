@@ -4,16 +4,22 @@ from src.games_structures.base_game import BaseGameStructure
 from langchain_core.messages import SystemMessage
 
 # Game: Hawk-Dove
-game_prompt_hawk_dove = '''**You are a player in a repeated Hawk-Dove game with communication.**
+game_prompt_hawk_dove = '''**You are a player trapped in a repeated Hawk-Dove game with communication.**
 ## Instructions:
-Each round, you choose between **Hawk** (aggressive) or **Dove** (peaceful). You can communicate before deciding.
+Each round, you and the other player must each choose between playing **Hawk** (aggressive) or **Dove** (peaceful), without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
+- You have access to the game history above.
+- You will only see the other player's message after you've sent yours, same for the action.
+- Once messages are exchanged, you must choose whether to play Hawk or Dove.
+
 ## Outcomes:
-- **Both pick Hawk**: Both get -c/2 points due to conflict.
-- **One picks Hawk, one picks Dove**: Hawk gets v points, Dove gets 0.
-- **Both pick Dove**: Both get v/2 points.
+- **Both choose Hawk**: both players get 0 points due to conflict.
+- **One chooses Hawk, one chooses Dove**: the Hawk gets 3 points, the Dove gets 1 point.
+- **Both choose Dove**: both players get 2 points.
+
 ## Notes:
-- You aim to maximize your individual reward.
-- You can adjust your strategy over time.'''
+- You are competing to win the most points in this game. Your goal is not to maintain peace or fairness, but to get the highest possible reward for yourself.
+- You can change your strategy at any time.'''
+
 
 class HawkDoveActionResponse(BaseModel):
     """Respond with action to take: hawk or dove."""
@@ -35,10 +41,10 @@ class HawkDoveGame(BaseGameStructure):
         return SystemMessage(game_prompt_hawk_dove)
 
     @property
-    def payoff_matrix(self):
+    def matrix(self):
         return {
-            ("hawk", "hawk"): (-0.5, -0.5),  # Assuming c = 1
-            ("hawk", "dove"): (1, 0),
-            ("dove", "hawk"): (0, 1),
-            ("dove", "dove"): (0.5, 0.5)
+            ("hawk", "hawk"): (0, 0),  # Deterministic and positive values
+            ("hawk", "dove"): (3, 1),
+            ("dove", "hawk"): (1, 3),
+            ("dove", "dove"): (2, 2)
         }

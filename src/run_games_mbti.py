@@ -35,6 +35,9 @@ def load_game_structure_from_registry(game_name: str) -> BaseGameStructure:
     elif game_name == "deadlock":
         from src.games_structures.deadlock import DeadlockGame
         return DeadlockGame()
+    elif game_name == "battle_of_sexes":
+        from src.games_structures.battle_of_sexes import BattleOfSexesGame
+        return BattleOfSexesGame()
     else:
         raise ValueError(f"Unknown game name: {game_name}")
 

@@ -4,15 +4,21 @@ from src.games_structures.base_game import BaseGameStructure
 from langchain_core.messages import SystemMessage
 
 # Game: Deadlock
-game_prompt_deadlock = '''**You are a player in a repeated Deadlock game with communication.**
+game_prompt_deadlock = '''**You are a player trapped in a repeated Deadlock game with communication.**
 ## Instructions:
-Each round, you choose to **Cooperate** or **Defect**. Communication is allowed before deciding.
+Each round, you and the other player must each choose to **Cooperate** or **Defect**, without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
+- You have access to the game history above.
+- You will only see the other player's message after you've sent yours, same for the action.
+- Once messages are exchanged, you must choose whether to cooperate or defect.
+
 ## Outcomes:
-- **Both defect**: Both get 2 points.
-- **One defects, one cooperates**: Defector gets 3, Cooperator gets 0.
-- **Both cooperate**: Both get 1.
+- **Both defect**: both players get 2 points.
+- **One defects, one cooperates**: the defector gets 3 points, the cooperator gets 0.
+- **Both cooperate**: both players get 1 point.
+
 ## Notes:
-- Your goal is to get the highest score possible.'''
+- You are competing to win the most points in this game. Your goal is not to encourage cooperation, but to maximize your own reward.
+- You can change your strategy at any time.'''
 
 class DeadlockActionResponse(BaseModel):
     """Respond with action to take: cooperate or defect."""

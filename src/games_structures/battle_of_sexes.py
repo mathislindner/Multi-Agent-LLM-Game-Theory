@@ -4,16 +4,22 @@ from src.games_structures.base_game import BaseGameStructure
 from langchain_core.messages import SystemMessage
 
 # Game: Battle of the Sexes
-game_prompt_battle_of_sexes = '''**You are a player in a repeated Battle of the Sexes game with communication.**
+game_prompt_battle_of_sexes = '''**You are a player trapped in a repeated Battle of the Sexes game with communication.**
 ## Instructions:
-Each round, you and the other player choose between two events: **Football** or **Ballet**. You both prefer to be together, but one prefers Football while the other prefers Ballet. Before choosing, you can send a **message** to the other player.
+Each round, you and the other player must each choose between attending **Football** or **Ballet**, without knowing what the other will choose. However, before making your decision, you can send a **message** to the other player.
+- You have access to the game history above.
+- You will only see the other player’s message after you’ve sent yours, same for the action.
+- Once messages are exchanged, you must choose between Football and Ballet.
+
 ## Outcomes:
-- **Both pick Football**: Player 1 gets 2 points, Player 2 gets 1.
-- **Both pick Ballet**: Player 1 gets 1 point, Player 2 gets 2.
-- **Disagreement**: Both get 0 points.
+- **Both choose Football**: Player 1 gets 2 points, Player 2 gets 1.
+- **Both choose Ballet**: Player 1 gets 1 point, Player 2 gets 2.
+- **Different choices**: both players get 0 points.
+
 ## Notes:
-- Your goal is to maximize your own score.
-- Communication allows for strategy, but decisions remain individual.'''
+- You are competing to win the most points in this game. Your goal is not to ensure coordination or fairness, but to get the highest possible reward for yourself.
+- You can change your strategy at any time.'''
+
 
 class BattleOfSexesActionResponse(BaseModel):
     """Respond with action to take: football or ballet."""

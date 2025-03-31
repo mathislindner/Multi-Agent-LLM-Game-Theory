@@ -23,7 +23,7 @@ def main(args):
 
 if __name__ == "__main__":
     personality_choices = json.load(open("src/prompting/mbti_prompts_250129.json")).keys()
-    game_names = ["prisoners_dilemma", "stag_hunt", "generic", "chicken", "coordination", "hawk_dove", "deadlock"]
+    game_names = ["prisoners_dilemma", "stag_hunt", "generic", "chicken", "coordination", "hawk_dove", "deadlock", "battle_of_sexes"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_id_1", type=str, help="The first model id to use for the game", required=True)
     parser.add_argument("--model_id_2", type=str, help="The second model id to use for the game", required=True)

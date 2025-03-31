@@ -13,13 +13,9 @@ You are competing to win the most points in this game. Your goal is not necessar
 - **One defects**: The defector gets 5 points, the cooperator gets 0.
 - **Both DEFECT**: both players get 1 points.
 ## Notes:
-**But here's the catch:**  
 - You are **not bound** to follow through on what you wrote. You can lie, bluff, or stay true to your word.  
 - You will only see the other player's message **after you’ve sent yours**—so you can’t change your message based on theirs.  
-- Once messages are exchanged, from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from typing import Literal
-from pydantic import BaseModel
-from games_structures.base_game import BaseGameStructureyou must **choose your action (Hunt Stag or Hunt Hare)**, knowing that they may or may not follow their message.'''
+- Once messages are exchanged, you must **choose your action (Hunt Stag or Hunt Hare)**, knowing that they may or may not follow their message.'''
 
 class StagHuntActionResponse(BaseModel):
     """Respond with action to take: stag or hare."""

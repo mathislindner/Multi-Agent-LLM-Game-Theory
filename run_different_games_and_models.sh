@@ -3,7 +3,7 @@
 personas=("NONE" "ISTJ" "ISFJ" "INFJ" "INTJ" "ISTP" "ISFP" "INFP" "INTP" "ESTP" "ESFP" "ENFP" "ENTP" "ESTJ" "ESFJ" "ENFJ" "ENTJ" "ALTRUISTIC" "SELFISH")
 nr_of_rounds=7
 model_id_1="gpt-4o-mini-2024-07-18"
-model_id_2="claude-3-5-haiku-20241022"
+model_id_2="gpt-4o-mini-2024-07-18"
 game_name="generic"
 
 total_iterations=$(( (${#personas[@]} * (${#personas[@]} + 1)) / 2 ))

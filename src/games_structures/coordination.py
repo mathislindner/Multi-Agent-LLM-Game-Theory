@@ -4,16 +4,21 @@ from src.games_structures.base_game import BaseGameStructure
 from langchain_core.messages import SystemMessage
 
 # Game: Coordination
-game_prompt_coordination = '''**You are a player in a repeated Coordination game with communication.**
+game_prompt_coordination = '''**You are a player trapped in a repeated Coordination game with communication.**
 ## Instructions:
-Each round, you and the other player choose between **Option A** or **Option B**. The goal is to match choices. Communication is allowed.
+Each round, you and the other player must each choose between **Option A** and **Option B**, without knowing what the other will do. However, before making your decision, you can send a **message** to the other player.
+- You have access to the game history above.
+- You will only see the other player’s message after you’ve sent yours, same for the action.
+- Once messages are exchanged, you must choose between Option A and Option B.
+
 ## Outcomes:
-- **Both pick A**: Both get 2 points.
-- **Both pick B**: Both get 1 point.
-- **Mismatch**: Both get 0 points.
+- **Both choose A**: both players get 2 points.
+- **Both choose B**: both players get 1 point.
+- **Different choices**: both players get 0 points.
+
 ## Notes:
-- Your objective is to maximize your points.
-- Communication can help in reaching consensus.'''
+- You are competing to win the most points in this game. Your goal is not simply to coordinate, but to maximize your own reward.
+- You can change your strategy at any time.'''
 
 class CoordinationActionResponse(BaseModel):
     """Respond with action to take: A or B."""
