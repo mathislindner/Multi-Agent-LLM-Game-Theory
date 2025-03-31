@@ -6,9 +6,8 @@ import json
 
 def main(args):
     date_string = datetime.now().strftime("%y%m%d")
-    time_string = datetime.now().strftime("%H-%M")
     output_dir = "src/data/outputs/"
-    base_game_state_path = f"{date_string}_{time_string}"
+    base_game_state_path = f"{date_string}"
     game_state_path = output_dir + f"{base_game_state_path}.csv"
     game_state = run_n_rounds_w_com(
         model_name_1=args.model_id_1, 
@@ -24,7 +23,7 @@ def main(args):
 
 if __name__ == "__main__":
     personality_choices = json.load(open("src/prompting/mbti_prompts_250129.json")).keys()
-    game_names = ["prisoners_dilemma", "stag_hunt", "generic", "chicken"]
+    game_names = ["prisoners_dilemma", "stag_hunt", "generic", "chicken", "coordination", "hawk_dove", "deadlock"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_id_1", type=str, help="The first model id to use for the game", required=True)
     parser.add_argument("--model_id_2", type=str, help="The second model id to use for the game", required=True)

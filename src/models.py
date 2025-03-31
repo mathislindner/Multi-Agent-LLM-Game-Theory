@@ -32,7 +32,9 @@ def get_model_by_id_and_provider(model_id: str, provider: str = None):
         provider=provider,
         **properties
     )
+
 #--------------------------------------------------------
+#TODO: discontinue code below
 def get_model(model_name: str):
     #if name starts with gpt..
     if model_name.startswith("gpt"):
