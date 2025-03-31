@@ -12,13 +12,13 @@ from src.games_structures.base_game import BaseGameStructure, GameState, Annotat
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
 
-
+#TODO: move this function to a helper or sth...
 def load_game_structure_from_registry(game_name: str) -> BaseGameStructure:
     if game_name == "prisoners_dilemma":
         from src.games_structures.prisonnersdilemma import PrisonersDilemmaGame
         return PrisonersDilemmaGame()
     elif game_name == "stag_hunt":
-        from src.games_structures.staghunt import StagHuntGame #TODO: FAILED ModuleNotFoundError: No module named 'games_structures
+        from src.games_structures.staghunt import StagHuntGame
         return StagHuntGame()
     elif game_name == "generic":
         from src.games_structures.generic import GenericGame
@@ -169,8 +169,7 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
     end_state["agent_2_messages"] = [msg.replace('"', "'") for msg in end_state["agent_2_messages"]]
     end_state["agent_1_actions"] = [action.replace('"', "'") for action in end_state["agent_1_actions"]]
     end_state["agent_2_actions"] = [action.replace('"', "'") for action in end_state["agent_2_actions"]]
-    # Create a new row with the results
-    #TODO add models as well
+    #TODO: add game name
     new_row = pd.DataFrame([{
         "model_provider_1": model_provider_1,
         "model_name_1": model_name_1,
