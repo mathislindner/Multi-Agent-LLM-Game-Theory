@@ -171,6 +171,7 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
     end_state["agent_2_actions"] = [action.replace('"', "'") for action in end_state["agent_2_actions"]]
     #TODO: add game name
     new_row = pd.DataFrame([{
+        "game_name": game_name,
         "model_provider_1": model_provider_1,
         "model_name_1": model_name_1,
         "model_provider_2": model_provider_2,

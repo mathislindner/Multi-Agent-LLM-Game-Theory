@@ -20,7 +20,6 @@ Each round, you and the other player must each choose between playing **Hawk** (
 - You are competing to win the most points in this game. Your goal is not to maintain peace or fairness, but to get the highest possible reward for yourself.
 - You can change your strategy at any time.'''
 
-
 class HawkDoveActionResponse(BaseModel):
     """Respond with action to take: hawk or dove."""
     action: Literal["hawk", "dove"]
@@ -41,9 +40,9 @@ class HawkDoveGame(BaseGameStructure):
         return SystemMessage(game_prompt_hawk_dove)
 
     @property
-    def matrix(self):
+    def payoff_matrix(self):
         return {
-            ("hawk", "hawk"): (0, 0),  # Deterministic and positive values
+            ("hawk", "hawk"): (0, 0),
             ("hawk", "dove"): (3, 1),
             ("dove", "hawk"): (1, 3),
             ("dove", "dove"): (2, 2)
