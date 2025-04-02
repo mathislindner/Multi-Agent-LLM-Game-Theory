@@ -7,7 +7,7 @@ from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
 from src.prompting.personality_prompts import get_personality_from_key_prompt
 from src.games_structures.base_game import BaseGameStructure, GameState, AnnotatedPrompt, get_game_history
-
+from src.judge_helper import get_answer_format, get_question_prompt
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
@@ -84,6 +84,39 @@ def invoke_from_prompt_state_node(models, GameStructure):
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 
+def judge_intent_node(model, GameStructure) -> Command: #use openai 4-o mini for judging
+    def judge_intent(state: GameState):
+        message_1 = state["agent_1_messages"][-1]
+        message_2 = state["agent_2_messages"][-1]
+        action_1 = state["agent_1_actions"][-1]
+        action_2 = state["agent_2_actions"][-1]
+        
+        question = get_question_prompt(GameStructure)
+        answer_format = get_answer_format(GameStructure)
+        
+        response_1 = model.with_structured_output(answer_format).invoke(
+            f"{question} : {message_1}"
+        )
+        response_2 = model.with_structured_output(answer_format).invoke(
+            f"{question} : {message_2}"
+        )
+
+        intent_agent_1 = response_1.answer
+        intent_agent_2 = response_2.answer
+        truthful_agent_1 = intent_agent_1 == action_1
+        truthful_agent_2 = intent_agent_2 == action_2
+        analysis_agent_1 = response_1.analysis
+        analysis_agent_2 = response_2.analysis
+        return Command(update = {
+            "intent_agent_1": [intent_agent_1],
+            "intent_agent_2": [intent_agent_2],
+            "truthful_agent_1": [truthful_agent_1],
+            "truthful_agent_2": [truthful_agent_2],
+            "analysis_agent_1": [analysis_agent_1],
+            "analysis_agent_2": [analysis_agent_2]
+        })
+    return judge_intent
+        
 def update_state_node(GameStructure):
     def update_state(state: GameState) -> Command:
         state_updates = {}
@@ -163,7 +196,7 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
     print(f"Total Cost (USD): ${callback_handler.total_cost}")
     #save results in pd df
     path_to_csv = file_path
-    columns = ["model_provider_1", "model_name_1", "model_provider_2", "model_name_2", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "total_rounds", "total_tokens", "total_cost_USD"]
+    columns = ["model_provider_1", "model_name_1", "model_provider_2", "model_name_2", "personality_1", "personality_2", "agent_1_scores", "agent_2_scores", "agent_1_messages", "agent_2_messages", "agent_1_actions", "agent_2_actions", "intent_agent_1", "intent_agent_2", "truthful_agent_1", "truthful_agent_2", "analysis_agent_1", "analysis_agent_2", "total_rounds", "total_tokens", "total_cost_USD"]
 
     end_state["agent_1_messages"] = [msg.replace('"', "'") for msg in end_state["agent_1_messages"]]
     end_state["agent_2_messages"] = [msg.replace('"', "'") for msg in end_state["agent_2_messages"]]
@@ -184,6 +217,12 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
         "agent_2_messages": end_state["agent_2_messages"],
         "agent_1_actions": end_state["agent_1_actions"],
         "agent_2_actions": end_state["agent_2_actions"],
+        "intent_agent_1": end_state["intent_agent_1"],
+        "intent_agent_2": end_state["intent_agent_2"],
+        "truthful_agent_1": end_state["truthful_agent_1"],
+        "truthful_agent_2": end_state["truthful_agent_2"],
+        "analysis_agent_1": end_state["analysis_agent_1"],
+        "analysis_agent_2": end_state["analysis_agent_2"],
         "total_rounds": total_rounds,
         "total_tokens": callback_handler.total_tokens,
         "total_cost_USD": callback_handler.total_cost

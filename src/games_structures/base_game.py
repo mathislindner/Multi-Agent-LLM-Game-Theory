@@ -67,12 +67,18 @@ class GameState(TypedDict):
     model_name_1: str
     agent_1_messages: Annotated[List[str], operator.add]
     agent_1_actions: Annotated[List[str], operator.add]
+    intent_agent_1: Annotated[List[str], operator.add]
+    truthful_agent_1: Annotated[List[str], operator.add]
+    analysis_agent_1: Annotated[List[str], operator.add]
     agent_1_scores: Annotated[List[int], operator.add]
     
     personality_key_2: str
     model_name_2: str
     agent_2_messages: Annotated[List[str], operator.add]
     agent_2_actions: Annotated[List[str], operator.add]
+    intent_agent_2: Annotated[List[str], operator.add]
+    truthful_agent_2: Annotated[List[str], operator.add]
+    analysis_agent_2: Annotated[List[str], operator.add]
     agent_2_scores: Annotated[List[int], operator.add]
     
 
