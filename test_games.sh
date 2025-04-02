@@ -1,6 +1,6 @@
 #!/bin/bash
 
-games=("prisoners_dilemma" "stag_hunt" "generic" "chicken" "coordination" "hawk_dove" "deadlock")
+games=("prisoners_dilemma" "stag_hunt")
 persona="INFJ"  # Randomly chosen persona for testing
 nr_of_rounds=2
 model_id_1="gpt-4o-mini-2024-07-18"

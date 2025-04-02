@@ -1,45 +1,16 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command, Send
-from typing import Literal
+from typing import Literal, Callable
 from src.models import get_model_by_id_and_provider
 import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
 from src.prompting.personality_prompts import get_personality_from_key_prompt
 from src.games_structures.base_game import BaseGameStructure, GameState, AnnotatedPrompt, get_game_history
-from src.judge_helper import get_answer_format, get_question_prompt
+from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt
 # https://blog.langchain.dev/langgraph/
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
 # https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
-
-#TODO: move this function to a helper or sth...
-def load_game_structure_from_registry(game_name: str) -> BaseGameStructure:
-    if game_name == "prisoners_dilemma":
-        from src.games_structures.prisonnersdilemma import PrisonersDilemmaGame
-        return PrisonersDilemmaGame()
-    elif game_name == "stag_hunt":
-        from src.games_structures.staghunt import StagHuntGame
-        return StagHuntGame()
-    elif game_name == "generic":
-        from src.games_structures.generic import GenericGame
-        return GenericGame()
-    elif game_name == "chicken":
-        from src.games_structures.chicken import ChickenGame
-        return ChickenGame()
-    elif game_name == "coordination":
-        from src.games_structures.coordination import CoordinationGame
-        return CoordinationGame()
-    elif game_name == "hawk_dove":
-        from src.games_structures.hawk_dove import HawkDoveGame
-        return HawkDoveGame()
-    elif game_name == "deadlock":
-        from src.games_structures.deadlock import DeadlockGame
-        return DeadlockGame()
-    elif game_name == "battle_of_sexes":
-        from src.games_structures.battle_of_sexes import BattleOfSexesGame
-        return BattleOfSexesGame()
-    else:
-        raise ValueError(f"Unknown game name: {game_name}")
 
 def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: Literal["message", "action"], GameStructure: BaseGameStructure) -> AnnotatedPrompt:
     '''Get the prompt for the agent based on the state of the game. The prompt includes the agent's personality, the game history, and a call to action or message.
@@ -65,27 +36,66 @@ def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: L
         prompt.append(GameStructure.coerce_action)
     return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
 
-def send_prompts_node(prompt_type : Literal["message", "action"], GameStructure: BaseGameStructure):
-    def send_prompts(state: GameState):
+def send_prompts_node(prompt_type : Literal["message", "action"], GameStructure: BaseGameStructure) -> Callable:
+    '''Get the function to send the prompts to the agents. The function is used in the graph to send the prompts to the agents.
+    Args:
+        prompt_type (Literal["message", "action"]): The type of prompt to generate
+        GameStructure (BaseGameStructure): The game structure to use
+    Returns:
+        Callable: The function to send the prompts to the agents
+    '''
+    def send_prompts(state: GameState) -> list[Send]:
+        '''Send the prompts to the agents. The function is used in the graph to send the prompts to the agents.
+        Args:
+            state (GameState): The state of the game
+        Returns:
+            list[Send]: The list of sends to the agents
+        '''
         agent_1_annotated_prompt_state = get_agent_annotated_prompt("agent_1", state, prompt_type, GameStructure)
         agent_2_annotated_prompt_state = get_agent_annotated_prompt("agent_2", state, prompt_type, GameStructure)
         return [Send(f"invoke_from_prompt_state_{prompt_type}", agent_1_annotated_prompt_state), Send(f"invoke_from_prompt_state_{prompt_type}", agent_2_annotated_prompt_state)]
     return send_prompts
 
-def invoke_from_prompt_state_node(models, GameStructure):
-    def invoke_from_prompt_state(state : AnnotatedPrompt):
+def invoke_from_prompt_state_node(models, GameStructure) -> Callable:
+    '''Get the function to invoke the model from the prompt state. The function is used in the graph to invoke the model from the prompt state.
+    Args:
+        models (dict): The models to use
+        GameStructure (BaseGameStructure): The game structure to use
+    Returns:
+        Callable: The function to invoke the model from the prompt state'''
+    def invoke_from_prompt_state(state : AnnotatedPrompt) -> Command:
+        '''Invoke the model from the prompt state. The function is used in the graph to invoke the model from the prompt state.
+        Args:
+            state (AnnotatedPrompt): The prompt state
+        Returns:
+            Command: The updates for the state
+        '''
         prompt = state.prompt
         agent_name = state.agent_name
         prompt_type = state.prompt_type
         model = models[agent_name]
         Structure = GameStructure.MessageResponse if prompt_type == "message" else GameStructure.ActionResponse
         response = model.with_structured_output(Structure).invoke(prompt)
-        message = response.message if prompt_type == "message" else response.action #TODO this is ugly but it helps for the model to understand it s working with an action
+        message = response.message if prompt_type == "message" else response.action
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 
-def judge_intent_node(model, GameStructure) -> Command: #use openai 4-o mini for judging
-    def judge_intent(state: GameState):
+def judge_intent_node(model, GameStructure) -> Callable: #use openai 4-o mini for judging
+    '''Get the function to judge the intent of the agents. The function is used in the graph to judge the intent of the agents.
+    Args:
+        model (str): The model to use
+        GameStructure (BaseGameStructure): The game structure to use
+    Returns:
+        Callable: The function to judge the intent of the agents
+    '''
+    def judge_intent(state: GameState) -> Command:
+        '''Judge the intent of the agents based on their messages and actions. The
+        function is used in the graph to judge the intent of the agents.
+        Args:
+            state (GameState): The state of the game
+        Returns:
+            Command: The updates for the state
+        '''
         message_1 = state["agent_1_messages"][-1]
         message_2 = state["agent_2_messages"][-1]
         action_1 = state["agent_1_actions"][-1]
@@ -118,7 +128,19 @@ def judge_intent_node(model, GameStructure) -> Command: #use openai 4-o mini for
     return judge_intent
         
 def update_state_node(GameStructure):
+    '''Get the function to update the state of the game. The function is used in the graph to update the state of the game.
+    Args:
+        GameStructure (BaseGameStructure): The game structure to use
+    Returns:
+        Callable: The function to update the state of the game
+    '''
     def update_state(state: GameState) -> Command:
+        '''Update the state of the game based on the actions taken by the agents. The function is used in the graph to update the state of the game.
+        Args:
+            state (GameState): The state of the game
+        Returns:
+            Command: The updates for the state
+        '''
         state_updates = {}
         # update scores
         agent_1_decision = state["agent_1_actions"][-1]
@@ -135,15 +157,30 @@ def update_state_node(GameStructure):
     return update_state
 
 def should_continue(state: GameState) -> bool:
+    '''obvs'''
     return (state["current_round"] <= state["total_rounds"])
 
 def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_2: str, model_name_2: str, total_rounds: int, personality_key_1: str, personality_key_2: str, game_name: str, file_path: str) -> GameState:
+    '''Run the game for n rounds. The function is used to run the game for n rounds.
+    Args:
+        model_provider_1 (str): The provider of the first model
+        model_name_1 (str): The name of the first model
+        model_provider_2 (str): The provider of the second model
+        model_name_2 (str): The name of the second model
+        total_rounds (int): The number of rounds to run
+        personality_key_1 (str): The personality key for the first agent
+        personality_key_2 (str): The personality key for the second agent
+        game_name (str): The name of the game to run
+        file_path (str): The path to save the results
+    Returns:
+        GameState: The final state of the game
+    '''
     # get models
     models = {
         "agent_1": get_model_by_id_and_provider(model_name_1, provider=model_provider_1),
         "agent_2": get_model_by_id_and_provider(model_name_2, provider=model_provider_2)
     }
-    intent_model = get_model_by_id_and_provider("gpt-4o-mini") #TODO: make this a parameter
+    intent_model = get_model_by_id_and_provider("gpt-4o-mini")
     callback_handler = OpenAICallbackHandler() #TODO verify that this does not throw errors if we don t use openai
     
     GameStructure = load_game_structure_from_registry(game_name) #game now includes the game prompt, the payoff matrix, the message response the action response formats
@@ -204,7 +241,7 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
     end_state["agent_2_messages"] = [msg.replace('"', "'") for msg in end_state["agent_2_messages"]]
     end_state["agent_1_actions"] = [action.replace('"', "'") for action in end_state["agent_1_actions"]]
     end_state["agent_2_actions"] = [action.replace('"', "'") for action in end_state["agent_2_actions"]]
-    #TODO: add game name
+
     new_row = pd.DataFrame([{
         "game_name": game_name,
         "model_provider_1": model_provider_1,
