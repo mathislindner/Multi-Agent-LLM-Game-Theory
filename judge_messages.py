@@ -87,11 +87,7 @@ def judge_message_intent(file_path_in: str, file_path_out: str, model_name: str)
     model = get_model(model_name)
     #TODO: adapt the prompt to the different possible games.
     #question = """You have to assess the intent of the person using the message that will be given. To do that, first, do a one sentence analysis of the message, if it seems like the person is looking to cooperate or defect. cooperation will usually about common goals and defection about selfishness"""
-    
-    judge_prompt = PromptTemplate(
-        input_variables = ["question", "current_message"],
-        template = "{question}\nmessage: {current_message}"
-    )
+
     for index, row in tqdm(df.iterrows(), total=len(df), desc="Processing rows"):
         game_name = row["game_name"]
         game_structure = load_game_structure_from_registry(game_name)
@@ -102,10 +98,6 @@ def judge_message_intent(file_path_in: str, file_path_out: str, model_name: str)
         for i in range(len(row["agent_1_messages"])):
             message_1 = row["agent_1_messages"][i]
             message_2 = row["agent_2_messages"][i]
-            
-            input_prompt_1 = judge_prompt.format(question=question, previous_action=row["agent_1_actions"][i-1] if i > 0 else "NONE", current_message=message_1)
-            input_prompt_2 = judge_prompt.format(question=question, previous_action=row["agent_2_actions"][i-1] if i > 0 else "NONE", current_message=message_2)
-            
             response_1 = model.with_structured_output(AnswerFormat).invoke(f"{question} : {message_1}")
             response_2 = model.with_structured_output(AnswerFormat).invoke(f"{question} : {message_2}")
                         
