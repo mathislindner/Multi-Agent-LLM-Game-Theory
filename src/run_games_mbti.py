@@ -5,36 +5,8 @@ from src.models import get_model_by_id_and_provider
 import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
-from src.prompting.personality_prompts import get_personality_from_key_prompt
-from src.games_structures.base_game import BaseGameStructure, GameState, AnnotatedPrompt, get_game_history
-from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt
-# https://blog.langchain.dev/langgraph/
-# https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/react-agent-structured-output.ipynb
-# https://github.com/langchain-ai/langgraph/blob/main/docs/docs/how-tos/map-reduce.ipynb
-
-def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: Literal["message", "action"], GameStructure: BaseGameStructure) -> AnnotatedPrompt:
-    '''Get the prompt for the agent based on the state of the game. The prompt includes the agent's personality, the game history, and a call to action or message.
-    Args:
-        agent_name (str): The name of the agent
-        state (GameState): The state of the game
-        prompt_type (Literal["message", "action"]): The type of prompt to generate
-    Returns:
-        AnnotatedPrompt: The prompt for the agent
-    '''
-    prompt = []
-    if agent_name == "agent_1":
-        agent_prompt = get_personality_from_key_prompt(state["personality_key_1"])
-    else:
-        agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
-    prompt.append(agent_prompt)
-    history = get_game_history(agent_name, state, prompt_type)
-    prompt.extend(history)
-    prompt.append(GameStructure.GAME_PROMPT)
-    if prompt_type == "message":
-        prompt.append(GameStructure.coerce_message)
-    else:
-        prompt.append(GameStructure.coerce_action)
-    return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
+from src.games_structures.base_game import BaseGameStructure, GameState
+from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt, get_agent_annotated_prompt, AnnotatedPrompt
 
 def send_prompts_node(prompt_type : Literal["message", "action"], GameStructure: BaseGameStructure) -> Callable:
     '''Get the function to send the prompts to the agents. The function is used in the graph to send the prompts to the agents.
