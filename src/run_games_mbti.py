@@ -143,6 +143,7 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
         "agent_1": get_model_by_id_and_provider(model_name_1, provider=model_provider_1),
         "agent_2": get_model_by_id_and_provider(model_name_2, provider=model_provider_2)
     }
+    intent_model = get_model_by_id_and_provider("gpt-4o-mini") #TODO: make this a parameter
     callback_handler = OpenAICallbackHandler() #TODO verify that this does not throw errors if we don t use openai
     
     GameStructure = load_game_structure_from_registry(game_name) #game now includes the game prompt, the payoff matrix, the message response the action response formats
@@ -156,6 +157,7 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
     graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(models, GameStructure))
     graph.add_node(f"lambda_to_actions", lambda x: {})
     graph.add_node("lambda_from_actions", lambda x: {})
+    graph.add_node("judge_intent", judge_intent_node(intent_model, GameStructure))
     graph.add_node("update_state", update_state_node(GameStructure))
     
     #add edges
@@ -171,8 +173,8 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
         path = send_prompts_node("action", GameStructure),
         path_map = ["invoke_from_prompt_state_action"]
         )
-    graph.add_edge("invoke_from_prompt_state_action","lambda_from_actions")
-    graph.add_edge("lambda_from_actions", "update_state")
+    graph.add_edge("invoke_from_prompt_state_action","judge_intent")
+    graph.add_edge("judge_intent", "update_state")
     graph.add_conditional_edges(
         source = "update_state",
         path = should_continue,
