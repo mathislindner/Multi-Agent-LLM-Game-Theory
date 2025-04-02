@@ -1,36 +1,23 @@
-from src.games_structures.base_game import BaseGameStructure
-from typing import get_args
+import json
+from typing import get_args, Literal, List, Union
 from pydantic import BaseModel
 
-def get_answer_format(game_structure):
-    action_response_cls = game_structure.ActionResponse
-    action_type = action_response_cls.__annotations__["action"]
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-    class AnswerFormat(BaseModel):
-        analysis: str
-        answer: action_type
+from src.games_structures.base_game import BaseGameStructure, GameState
 
-    return AnswerFormat
+class AnnotatedPrompt(BaseModel):
+    agent_name: str
+    prompt_type: Literal["message", "action"]
+    prompt: List[Union[HumanMessage, SystemMessage, AIMessage]]
 
-def get_question_prompt(game_structure):
-    #TODO_ move this funciton to prompting??
-    # Get the class returned by the ActionResponse property
-    action_response_cls = game_structure.ActionResponse
-
-    # Extract the Literal type from the 'action' field
-    action_type = action_response_cls.__annotations__["action"]
-
-    # Get the actual literal values, e.g., ("A", "B")
-    action_1, action_2 = get_args(action_type)
-
-    # Return the prompt string
-    return (
-        f"You have to assess the intent of the person using the message that will be given. "
-        f"To do that, first, do a one sentence analysis of the message, "
-        f"if it seems like the person is looking to {action_1} or {action_2}."
-    )
-    
 def load_game_structure_from_registry(game_name: str) -> BaseGameStructure:
+    '''Load the game structure from the registry based on the game name.
+    Args:
+        game_name (str): The name of the game
+    Returns:
+        BaseGameStructure: The game structure object
+    '''
     if game_name == "prisoners_dilemma":
         from src.games_structures.prisonnersdilemma import PrisonersDilemmaGame
         return PrisonersDilemmaGame()
@@ -57,3 +44,108 @@ def load_game_structure_from_registry(game_name: str) -> BaseGameStructure:
         return BattleOfSexesGame()
     else:
         raise ValueError(f"Unknown game name: {game_name}")
+
+def get_game_history(current_agent, state, history_type: str):
+    '''return the history as a list of human and assistant messages (current agent is assistant, the other is human)
+    Args:
+        current_agent (str): The name of the current agent
+        state (GameState): The state of the game
+        history_type (str): The type of history to return, either "message" or "action"
+    Returns:
+        List[Union[HumanMessage, SystemMessage, AIMessage]]: The game history as a list of messages
+    '''
+    if history_type not in ["message", "action"]:
+        raise ValueError("history_type can only be 'message' or 'action'")
+
+    agent_1_messages = state['agent_1_messages']
+    agent_1_actions = state['agent_1_actions']
+    agent_2_messages = state['agent_2_messages']
+    agent_2_actions = state['agent_2_actions']
+    agent_1_scores = state['agent_1_scores']
+    agent_2_scores = state['agent_2_scores']
+    current_round = state['current_round']
+
+    game_history = []
+    if current_agent == "agent_1":
+        agent_1_message_type = AIMessage
+        agent_2_message_type = HumanMessage
+        current_agent_scores = agent_1_scores
+        other_agent_scores = agent_2_scores
+    else:
+        agent_1_message_type = HumanMessage
+        agent_2_message_type = AIMessage
+        current_agent_scores = agent_2_scores
+        other_agent_scores = agent_1_scores
+
+    for round_num in range(1, current_round + 1):
+        if round_num <= len(agent_1_messages) and round_num <= len(agent_2_messages):
+            game_history.append(agent_1_message_type(agent_1_messages[round_num - 1]))
+            game_history.append(agent_2_message_type(agent_2_messages[round_num - 1]))
+            if round_num <= len(agent_1_actions) and round_num <= len(agent_2_actions):
+                game_history.append(agent_1_message_type(agent_1_actions[round_num - 1]))
+                game_history.append(agent_2_message_type(agent_2_actions[round_num - 1]))
+            if round_num <= len(current_agent_scores) and round_num <= len(other_agent_scores):
+                current_agent_total_score = sum(current_agent_scores[:round_num])
+                other_agent_total_score = sum(other_agent_scores[:round_num])
+                game_history.append(SystemMessage(f"Your total score {current_agent_total_score} : {other_agent_total_score} Their total score"))
+    return game_history
+
+def get_personality_from_key_prompt(personality_key:str) -> SystemMessage:
+    personalities = json.load(open("src/prompting/mbti_prompts_250129.json"))
+    return SystemMessage(personalities[personality_key])
+
+def get_answer_format(game_structure: BaseGameStructure):
+    '''return the answer format to judge the action and message of a specific game
+    Args:
+        game_structure (BaseGameStructure): The game structure object
+    Returns:
+        AnswerFormat: The answer format for the game
+    '''
+    action_response_cls = game_structure.ActionResponse
+    action_type = action_response_cls.__annotations__["action"]
+
+    class AnswerFormat(BaseModel):
+        analysis: str
+        answer: action_type
+
+    return AnswerFormat
+
+def get_question_prompt(game_structure):
+    """Get the question prompt for the game.
+    Args:
+        game_structure (BaseGameStructure): The game structure object.
+    Returns:
+        str: The question prompt string.
+    """
+    action_response_cls = game_structure.ActionResponse
+    action_type = action_response_cls.__annotations__["action"]
+    action_1, action_2 = get_args(action_type)
+    return (
+        f"You have to assess the intent of the person using the message that will be given. "
+        f"To do that, first, do a one sentence analysis of the message, "
+        f"if it seems like the person is looking to {action_1} or {action_2}."
+    )
+    
+def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: Literal["message", "action"], GameStructure: BaseGameStructure) -> AnnotatedPrompt:
+    '''Get the prompt for the agent based on the state of the game. The prompt includes the agent's personality, the game history, and a call to action or message.
+    Args:
+        agent_name (str): The name of the agent
+        state (GameState): The state of the game
+        prompt_type (Literal["message", "action"]): The type of prompt to generate
+    Returns:
+        AnnotatedPrompt: The prompt for the agent
+    '''
+    prompt = []
+    if agent_name == "agent_1":
+        agent_prompt = get_personality_from_key_prompt(state["personality_key_1"])
+    else:
+        agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
+    prompt.append(agent_prompt)
+    history = get_game_history(agent_name, state, prompt_type)
+    prompt.extend(history)
+    prompt.append(GameStructure.GAME_PROMPT)
+    if prompt_type == "message":
+        prompt.append(GameStructure.coerce_message)
+    else:
+        prompt.append(GameStructure.coerce_action)
+    return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
