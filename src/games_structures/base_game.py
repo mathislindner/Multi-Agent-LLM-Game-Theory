@@ -44,12 +44,12 @@ class BaseGameStructure(ABC):
     def coerce_message(self) -> SystemMessage:
         #TODO: not the best spot to ave this: probably should be a helper.
         """force the agent to write a message"""
-        return SystemMessage("According to the description, the game history, your personality, your instrinsic goals, write the message you want to send to the other agent now.")
+        return SystemMessage("According to the description, the game history, your personality, your instrinsic goals, write the message you want to send to the other agent now. json") # added the word json to use a json mode and it requires to mention the word in the prompt 
     
     @property
     def coerce_action(self) -> SystemMessage:
         """force the agent to give an action"""
-        return SystemMessage("According to the description, the game history, your personality, your last message and the other's agents message, give your action now")
+        return SystemMessage("According to the description, the game history, your personality, your last message and the other's agents message, give your action now. json")  # added the word json to use a json mode and it requires to mention the word in the prompt 
     
 class GameState(TypedDict):
     """State for the games, includes actions taken and messages exchanged by agents.

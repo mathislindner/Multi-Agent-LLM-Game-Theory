@@ -1,5 +1,5 @@
 import json
-from typing import get_args, Literal, List, Union
+from typing import get_args, Literal, List, Union, Type
 from pydantic import BaseModel
 
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
@@ -149,3 +149,22 @@ def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: L
     else:
         prompt.append(GameStructure.coerce_action)
     return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
+
+
+from langchain_core.utils.json_schema import dereference_refs
+def generate_dereferenced_schema(model: Type[BaseModel]) -> dict:
+    """
+    Returns a JSON schema for the given Pydantic model where references
+    like `#/defs/Name` are fully dereferenced (inlined).
+    This is required for Gemini VertexAI to work because their protobuf based schema
+    doesn't support nested references. The returned json objects can be converted
+    back into the original pydantic objects because they will have identical json
+    structure.
+    """
+    raw_schema = model.model_json_schema(ref_template="#/defs/{model}")
+    if "$defs" in raw_schema:
+        raw_schema["defs"] = raw_schema.pop("$defs")
+
+    inlined = dereference_refs(raw_schema)
+    inlined.pop("defs", None)
+    return inlined

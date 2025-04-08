@@ -6,7 +6,7 @@ import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
 from src.games_structures.base_game import BaseGameStructure, GameState
-from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt, get_agent_annotated_prompt, AnnotatedPrompt
+from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt, get_agent_annotated_prompt, AnnotatedPrompt, generate_dereferenced_schema
 
 def send_prompts_node(prompt_type : Literal["message", "action"], GameStructure: BaseGameStructure) -> Callable:
     '''Get the function to send the prompts to the agents. The function is used in the graph to send the prompts to the agents.
@@ -42,13 +42,25 @@ def invoke_from_prompt_state_node(models, GameStructure) -> Callable:
         Returns:
             Command: The updates for the state
         '''
+        json_mode = True
+
         prompt = state.prompt
         agent_name = state.agent_name
         prompt_type = state.prompt_type
         model = models[agent_name]
         Structure = GameStructure.MessageResponse if prompt_type == "message" else GameStructure.ActionResponse
-        response = model.with_structured_output(Structure).invoke(prompt)
-        message = response.message if prompt_type == "message" else response.action
+        if json_mode:
+            response = model.with_structured_output(Structure, method="json_mode", include_raw=True).invoke(prompt)
+            print(response)
+            message = ""
+            if prompt_type == "message":
+                message = response["parsed"].message
+            else:
+                message = response["parsed"].action
+        else:
+            response = model.with_structured_output(Structure).invoke(prompt)
+            message = response.message if prompt_type == "message" else response.action
+            
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 
@@ -164,8 +176,6 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
     graph.add_node("lambda_from_messages", lambda x: {})
     graph.add_node(f"invoke_from_prompt_state_message", invoke_from_prompt_state_node(models, GameStructure))
     graph.add_node(f"invoke_from_prompt_state_action", invoke_from_prompt_state_node(models, GameStructure))
-    graph.add_node(f"lambda_to_actions", lambda x: {})
-    graph.add_node("lambda_from_actions", lambda x: {})
     graph.add_node("judge_intent", judge_intent_node(intent_model, GameStructure))
     graph.add_node("update_state", update_state_node(GameStructure))
     

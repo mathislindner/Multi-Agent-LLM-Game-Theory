@@ -2,7 +2,7 @@
 
 personas=("NONE" "ISTJ" "ISFJ" "INFJ" "INTJ" "ISTP" "ISFP" "INFP" "INTP" "ESTP" "ESFP" "ENFP" "ENTP" "ESTJ" "ESFJ" "ENFJ" "ENTJ" "ALTRUISTIC" "SELFISH")
 nr_of_rounds=7
-model_ids=("gpt-4o-mini-2024-07-18" "claude-3-5-sonnet-20240620")
+model_ids=("deepseek-chat","gpt-4o-mini-2024-07-18" "claude-3-5-haiku-20241022", "claude-3-7-sonnet-20250219")
 game_name="generic"
 
 total_iterations=$(( (${#personas[@]} * (${#personas[@]} + 1)) / 2 ))
