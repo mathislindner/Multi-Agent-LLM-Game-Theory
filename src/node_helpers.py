@@ -168,3 +168,21 @@ def generate_dereferenced_schema(model: Type[BaseModel]) -> dict:
     inlined = dereference_refs(raw_schema)
     inlined.pop("defs", None)
     return inlined
+
+def merge_following_system_prompts(prompts : List[Union[HumanMessage, SystemMessage, AIMessage]]):
+    """
+    Only merges prompts that are of type SystemMessage and are following each other
+    """
+    merged = []
+    current_content = []
+    for prompt in prompts:
+        if isinstance(prompt, SystemMessage):
+            current_content.append(prompt.content)
+        else:
+            if current_content:
+                merged.append(SystemMessage(content="".join(current_content)))
+                current_content = []
+            merged.append(prompt)
+    if current_content:
+        merged.append(SystemMessage(content="".join(current_content)))
+    return merged
