@@ -1,5 +1,6 @@
 langchain
 langgraph
+langchain_community
 matplotlib
 numpy
 pandas
@@ -7,3 +8,7 @@ scikit-learn
 scipy
 seaborn
 tqdm
+python-dotenv
+
+langchain-anthropic
+langchain-openai

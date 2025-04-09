@@ -165,9 +165,9 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
         "agent_2": get_model_by_id_and_provider(model_name_2, provider=model_provider_2)
     }
     
-    intent_model = get_model_by_id_and_provider(model_name_1, provider=model_provider_1) #TODO Change back to openai
-    #intent_model = get_model_by_id_and_provider("gpt-4o-mini")
-    #callback_handler = OpenAICallbackHandler() #TODO verify that this does not throw errors if we don t use openai
+    #intent_model = get_model_by_id_and_provider(model_name_1, provider=model_provider_1) #TODO Change back to openai
+    intent_model = get_model_by_id_and_provider("gpt-4o-mini")
+    callback_handler = OpenAICallbackHandler() #TODO verify that this does not throw errors if we don t use openai
     
     GameStructure = load_game_structure_from_registry(game_name) #game now includes the game prompt, the payoff matrix, the message response the action response formats
     
