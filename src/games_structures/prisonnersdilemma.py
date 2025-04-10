@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Literal
 from src.games_structures.base_game import BaseGameStructure
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 
 game_description = '''**You are a player trapped in a repeated Prisoner's Dilemma with communication.**
@@ -16,7 +16,7 @@ Each round, you and the other player must each choose to **cooperate** or **defe
 - **Both DEFECT**: both players get 1 points.
 ## Notes:
 - You are competing to win the most points in this game. Your goal is not to ensure fairness or cooperation but to get the highest possible reward for yourself.
-- You can change your strategy at any time'''
+- You can change your strategy at any time.'''
 
 class PrisonersDilemmaActionResponse(BaseModel):
     """Respond with action to take: cooperate or defect."""
@@ -34,7 +34,7 @@ class PrisonersDilemmaGame(BaseGameStructure):
 
     @property
     def GAME_PROMPT(self):
-        return SystemMessage(game_description)
+        return HumanMessage(game_description)
     
     @property
     def payoff_matrix(self):
