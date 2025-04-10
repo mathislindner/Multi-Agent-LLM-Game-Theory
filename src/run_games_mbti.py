@@ -48,14 +48,12 @@ def invoke_from_prompt_state_node(models, GameStructure) -> Callable:
 
         prompt = state.prompt
         prompt = merge_following_system_prompts(prompt)
-        prompt.append(HumanMessage(content="."))
         agent_name = state.agent_name
         prompt_type = state.prompt_type
         model = models[agent_name]
         Structure = GameStructure.MessageResponse if prompt_type == "message" else GameStructure.ActionResponse
         if json_mode:
             response = model.with_structured_output(Structure, method="json_mode", include_raw=True).invoke(prompt)
-            print(response)
             message = ""
             if prompt_type == "message":
                 message = response["parsed"].message
@@ -64,7 +62,7 @@ def invoke_from_prompt_state_node(models, GameStructure) -> Callable:
         else:
             response = model.with_structured_output(Structure).invoke(prompt)
             message = response.message if prompt_type == "message" else response.action
-            
+        print (f"Agent {agent_name} {prompt_type} : {message}")
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 
