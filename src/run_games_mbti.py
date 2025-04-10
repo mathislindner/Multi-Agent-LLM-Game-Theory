@@ -44,7 +44,13 @@ def invoke_from_prompt_state_node(models, GameStructure) -> Callable:
         Returns:
             Command: The updates for the state
         '''
-        json_mode = True
+        json_mode = False
+        try:
+            for model in models.values():
+                if model.model_name == "deepseek-chat":
+                    json_mode = True
+        except:
+            pass
 
         prompt = state.prompt
         prompt = merge_following_system_prompts(prompt)

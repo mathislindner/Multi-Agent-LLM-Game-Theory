@@ -19,10 +19,12 @@ for k, v in os.environ.items():
 def get_model_by_id_and_provider(model_id: str, provider: str = None):
     properties = {
         "temperature": 0,
-        #"seed": 42, #seed doesn t work with anthropic
-        "max_retries": 3,
-        "timeout": 2000
+        "max_retries": 3
+        #"timeout": 2000
     }
+    if provider != "anthropic":
+        properties["seed"] = 42  # seed doesn’t work with anthropic
+        
     if provider is None:
         return init_chat_model(
             model_id,
