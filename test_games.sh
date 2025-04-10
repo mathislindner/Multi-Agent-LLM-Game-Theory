@@ -13,13 +13,12 @@ nr_of_rounds=2
 #model_provider_2="google_genai"
 #model_id_1="gemini-1.5-pro-001"
 #model_id_2="gemini-1.5-pro-001"
-#model_provider_1="google_genai"
-#model_provider_2="google_genai"
 
-model_provider_1="anthropic"
-model_provider_2="anthropic"
-model_id_1="claude-3-5-haiku-20241022"
-model_id_2="claude-3-5-haiku-20241022"
+#model_provider_1="anthropic"
+#model_provider_2="anthropic"
+#model_id_1="claude-3-5-haiku-20241022"
+#model_id_2="claude-3-5-haiku-20241022"
+
 total_iterations=${#games[@]}
 current_iteration=0
 

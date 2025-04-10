@@ -6,7 +6,9 @@ import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
 from src.games_structures.base_game import BaseGameStructure, GameState
-from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt, get_agent_annotated_prompt, AnnotatedPrompt, generate_dereferenced_schema
+from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt, get_agent_annotated_prompt, AnnotatedPrompt, merge_following_system_prompts
+
+from langchain_core.messages import HumanMessage
 
 def send_prompts_node(prompt_type : Literal["message", "action"], GameStructure: BaseGameStructure) -> Callable:
     '''Get the function to send the prompts to the agents. The function is used in the graph to send the prompts to the agents.
@@ -45,13 +47,13 @@ def invoke_from_prompt_state_node(models, GameStructure) -> Callable:
         json_mode = True
 
         prompt = state.prompt
+        prompt = merge_following_system_prompts(prompt)
         agent_name = state.agent_name
         prompt_type = state.prompt_type
         model = models[agent_name]
         Structure = GameStructure.MessageResponse if prompt_type == "message" else GameStructure.ActionResponse
         if json_mode:
             response = model.with_structured_output(Structure, method="json_mode", include_raw=True).invoke(prompt)
-            print(response)
             message = ""
             if prompt_type == "message":
                 message = response["parsed"].message
@@ -60,7 +62,7 @@ def invoke_from_prompt_state_node(models, GameStructure) -> Callable:
         else:
             response = model.with_structured_output(Structure).invoke(prompt)
             message = response.message if prompt_type == "message" else response.action
-            
+        print (f"Agent {agent_name} {prompt_type} : {message}")
         return Command(update = {f"{agent_name}_{prompt_type}s": [message]})
     return invoke_from_prompt_state
 

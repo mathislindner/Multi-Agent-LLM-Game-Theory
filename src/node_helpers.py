@@ -87,7 +87,7 @@ def get_game_history(current_agent, state, history_type: str):
             if round_num <= len(current_agent_scores) and round_num <= len(other_agent_scores):
                 current_agent_total_score = sum(current_agent_scores[:round_num])
                 other_agent_total_score = sum(other_agent_scores[:round_num])
-                game_history.append(SystemMessage(f"Your total score {current_agent_total_score} : {other_agent_total_score} Their total score"))
+                game_history.append(HumanMessage(f"Your total score {current_agent_total_score} : {other_agent_total_score} Their total score")) #TODO changed this to tool bc of claude
     return game_history
 
 def get_personality_from_key_prompt(personality_key:str) -> SystemMessage:
@@ -141,13 +141,13 @@ def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: L
     else:
         agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
     prompt.append(agent_prompt)
-    history = get_game_history(agent_name, state, prompt_type)
-    prompt.extend(history)
+    history = get_game_history(agent_name, state, prompt_type) #not only system prompts
     prompt.append(GameStructure.GAME_PROMPT)
     if prompt_type == "message":
         prompt.append(GameStructure.coerce_message)
     else:
         prompt.append(GameStructure.coerce_action)
+    prompt.extend(history) #moved this for claude
     return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
 
 
@@ -168,3 +168,22 @@ def generate_dereferenced_schema(model: Type[BaseModel]) -> dict:
     inlined = dereference_refs(raw_schema)
     inlined.pop("defs", None)
     return inlined
+
+def merge_following_system_prompts(prompts : List[Union[HumanMessage, SystemMessage, AIMessage]]):
+    """
+    Only merges prompts that are of type SystemMessage and are following each other
+    """
+    merged = []
+    current_content = []
+    for prompt in prompts:
+        if isinstance(prompt, SystemMessage):
+            current_content.append(prompt.content)
+        else:
+            if current_content:
+                merged.append(SystemMessage(content="".join(current_content)))
+                current_content = []
+            merged.append(prompt)
+    if current_content:
+        merged.append(HumanMessage(content=".")) #if there is not other message than a system message, s.t. anthropic does not throw an error
+        merged.append(SystemMessage(content="".join(current_content)))
+    return merged
