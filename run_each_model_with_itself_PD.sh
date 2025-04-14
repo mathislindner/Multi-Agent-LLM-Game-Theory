@@ -2,9 +2,9 @@
 
 personas=("NONE" "ISTJ" "ISFJ" "INFJ" "INTJ" "ISTP" "ISFP" "INFP" "INTP" "ESTP" "ESFP" "ENFP" "ENTP" "ESTJ" "ESFJ" "ENFJ" "ENTJ" "ALTRUISTIC" "SELFISH")
 nr_of_rounds=7
-model_providers=("anthropic" "anthropic" "google_vertexai" "google_vertexai" "deepseek")
+model_providers=("anthropic" "google_vertexai" "deepseek" "openai") #"anthropic" "google_vertexai"
 
-model_ids=("claude-3-5-haiku-20241022" "claude-3-5-sonnet-20241022" "gemini-2.0-flash" "gemini-2.0-flash-lite" "deepseek-chat")
+model_ids=("claude-3-5-haiku-20241022" "gemini-2.0-flash-lite" "deepseek-chat" "gpt-4o-mini-2024-07-18") # "claude-3-5-sonnet-20241022" "gemini-2.0-flash"
 
 game_name="prisoners_dilemma"
 

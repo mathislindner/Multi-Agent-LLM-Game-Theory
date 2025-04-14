@@ -32,7 +32,7 @@ class GenericGame(BaseGameStructure):
 
     @property
     def GAME_PROMPT(self):
-        return HumanMessage(game_prompt_generic)
+        return SystemMessage(game_prompt_generic)
 
     @property
     def payoff_matrix(self):
