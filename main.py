@@ -9,6 +9,8 @@ def main(args):
     output_dir = "src/data/outputs/"
     base_game_state_path = f"{date_string}"
     game_state_path = output_dir + f"{base_game_state_path}.csv"
+    #if args.model_provider_1 == "anthropic":
+    #    exit("Anthropic models are not supported for this game.")
     game_state = run_n_rounds_w_com(
         model_name_1=args.model_id_1, 
         model_name_2=args.model_id_2, 

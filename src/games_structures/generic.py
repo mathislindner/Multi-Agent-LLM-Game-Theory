@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Literal
 from src.games_structures.base_game import BaseGameStructure
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 game_prompt_generic = '''**You are a player in a repeated game with communication.**
 ## Instructions:

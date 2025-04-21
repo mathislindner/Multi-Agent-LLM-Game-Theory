@@ -137,17 +137,23 @@ def get_agent_annotated_prompt(agent_name: str, state: GameState, prompt_type: L
     '''
     prompt = []
     if agent_name == "agent_1":
-        agent_prompt = get_personality_from_key_prompt(state["personality_key_1"])
+        agent_prompt = get_personality_from_key_prompt(state["personality_key_1"]) #system
     else:
-        agent_prompt = get_personality_from_key_prompt(state["personality_key_2"])
+        agent_prompt = get_personality_from_key_prompt(state["personality_key_2"]) #system
     prompt.append(agent_prompt)
     history = get_game_history(agent_name, state, prompt_type) #not only system prompts
+    
+    if (len(history)>0):
+        prompt.append(SystemMessage("The following are the previous interactions"))
+        prompt.extend(history) #moved this for claude
+    else:
+        prompt.append(SystemMessage("No history for now, this is a new game."))
+        
     prompt.append(GameStructure.GAME_PROMPT)
     if prompt_type == "message":
-        prompt.append(GameStructure.coerce_message)
+        prompt.append(GameStructure.coerce_message) #changed for Anthropic to humanmessage
     else:
         prompt.append(GameStructure.coerce_action)
-    prompt.extend(history) #moved this for claude
     return AnnotatedPrompt(agent_name=agent_name, prompt_type=prompt_type, prompt=prompt)
 
 
