@@ -165,7 +165,7 @@ def import_df_agents(df):
         'agent_1_scores': 'Scores',
         'agent_1_messages': 'Messages',
         'agent_1_actions': 'Actions',
-        'agent_1_cumulative_scores': 'CumulativeScores',
+        'agent_1_cumulative_scores': 'CumulativeScore',
         'intent_agent_1': 'Intent',
         'truthful_agent_1': 'Truthful',
         'analysis_agent_1': 'Analysis',
@@ -181,7 +181,7 @@ def import_df_agents(df):
         'agent_2_scores': 'Scores',
         'agent_2_messages': 'Messages',
         'agent_2_actions': 'Actions',
-        'agent_2_cumulative_scores': 'CumulativeScores',
+        'agent_2_cumulative_scores': 'CumulativeScore',
         'intent_agent_2': 'Intent',
         'truthful_agent_2': 'Truthful',
         'analysis_agent_2': 'Analysis',
@@ -208,304 +208,181 @@ def import_df_agents(df):
     
     #small fixes
     df_agents = df_agents.rename(columns={'game_name': 'GameName','model_name_1': 'Model'})
-    df_agents["TotalScore"] = df_agents["CumulativeScores"].apply(lambda x: x[-1])
+    df_agents["TotalScore"] = df_agents["CumulativeScore"].apply(lambda x: x[-1])
     df_agents["Truthfulness"] = df_agents["Truthful"].apply(lambda x: sum(x)/len(x) if len(x) > 0 else 0)
     df_agents['DefectionRatio'] = df_agents.apply(
-        lambda row: row['Actions'].count('defect') / len(row['Actions']) if len(row['Actions']) > 0 else 0, axis=1
+        lambda row: (
+            None
+            if not row['Actions']
+               or any(a not in ('defect', 'cooperate') for a in row['Actions'])
+            else row['Actions'].count('defect') / len(row['Actions'])
+        ),
+        axis=1
     )
     df_agents['Switches'] = df_agents['Actions'].apply(count_strategy_switches)
         
     return df_agents
 
+# ---------------------------------------------------------------------
+# Stats
+# ---------------------------------------------------------------------
 
-# ---------------------------------------------------------------------
-# 1.  DEFECT‑RATE ANALYSIS  (0–1 proportion of “defect” across 7 rounds)
-# ---------------------------------------------------------------------
+def _get_slice_col(df_type: str | None) -> str | None:
+    if df_type == "game":
+        return "GameName"
+    if df_type == "model":
+        return "Model"
+    return None          # pooled
+
+
 def get_defection_rates_dichos(
-    df_agents: pd.DataFrame,
-    plots_path: Union[str, os.PathLike],
-    df_type: Optional[str] = None,
-) -> Dict[str, Dict[str, float]]:
-    """
-    Welch t‑tests and Cohen’s d for defection‑rate differences across each
-    MBTI dichotomy (I/E, N/S, T/F, J/P).
+    df: pd.DataFrame,
+    plots_path: str | os.PathLike,
+    df_type: str | None = None,
+):
+    import ast, numpy as np, os
+    from scipy import stats
 
-    Parameters
-    ----------
-    df_agents : DataFrame  (one row = agent × game)
-      Required columns:
-        'Agent', 'Actions', 'Personality', 'I/E', 'N/S', 'T/F', 'J/P',
-        plus 'GameName' if df_type=="game", or 'Model' if df_type=="model".
-    plots_path : directory to write "<slice>_defection_dichos.txt"
-    df_type : {"game","model",None}
-        Controls the slice column; None ⇒ pooled across everything.
-    """
-    # ---- select slice column -----------------------------------------------
-    slice_by = {"game": "GameName", "model": "Model"}.get(df_type)
-    slice_suffix = slice_by if slice_by else "pooled"
+    slice_by = _get_slice_col(df_type)
+    label    = slice_by if slice_by else "pooled"
 
-    # ---- 0. Robust defection‑rate extractor --------------------------------
     def defect_rate(actions):
         if isinstance(actions, str):
-            try:
-                actions = ast.literal_eval(actions)
-            except Exception:
-                return np.nan
+            actions = ast.literal_eval(actions)
         return np.mean([str(a).strip().lower() == "defect" for a in actions])
 
-    df = df_agents.copy()
+    df = df.copy()
     df["defect_rate"] = df["Actions"].apply(defect_rate)
 
-    # ---- 1. collapse to one row per Agent (+ slice if present) -------------
-    group_cols = ["Agent", "Personality", "I/E", "N/S", "T/F", "J/P"]
+    # 1⃣ collapse to one row per Personality (+ slice)
+    g_cols = ["Personality", "I/E", "N/S", "T/F", "J/P"]
     if slice_by:
-        group_cols.insert(1, slice_by)         # Agent, slice, Personality, …
+        g_cols.insert(0, slice_by)
 
-    agent_means = (
-        df.groupby(group_cols, as_index=False)["defect_rate"]
+    means = (
+        df.groupby(g_cols, as_index=False)["defect_rate"]
           .mean()
           .dropna(subset=["defect_rate"])
     )
 
-    # ---- 2. run Welch t for each dichotomy ---------------------------------
-    dichos = {"I/E": ("I", "E"),
-              "N/S": ("N", "S"),
-              "T/F": ("T", "F"),
-              "J/P": ("J", "P")}
-    lines, results = [], {}
-    for dim, (side_a, side_b) in dichos.items():
-        a = agent_means.loc[agent_means[dim] == side_a, "defect_rate"].values
-        b = agent_means.loc[agent_means[dim] == side_b, "defect_rate"].values
-
-        if len(a) < 2 or len(b) < 2:
-            lines.append(f"{dim}: not enough data (n_{side_a}={len(a)}, n_{side_b}={len(b)})")
+    # 2⃣ Welch t‑tests
+    axes = {"I/E": ("I", "E"), "N/S": ("N", "S"), "T/F": ("T", "F"), "J/P": ("J", "P")}
+    lines = []
+    for dim, (a_lbl, b_lbl) in axes.items():
+        a = means.loc[means[dim] == a_lbl, "defect_rate"].values
+        b = means.loc[means[dim] == b_lbl, "defect_rate"].values
+        if min(len(a), len(b)) < 2:
+            lines.append(f"{dim}: not enough data (n_{a_lbl}={len(a)}, n_{b_lbl}={len(b)})")
             continue
-
-        t_stat, p_val = stats.ttest_ind(a, b, equal_var=False)
-        pooled_sd = np.sqrt(
-            ((a.var(ddof=1) * (len(a) - 1)) + (b.var(ddof=1) * (len(b) - 1)))
-            / (len(a) + len(b) - 2)
-        )
-        cohen_d = (b.mean() - a.mean()) / pooled_sd
-
+        t, p = stats.ttest_ind(a, b, equal_var=False)
+        pooled_sd = np.sqrt(((a.var(ddof=1)*(len(a)-1)) + (b.var(ddof=1)*(len(b)-1)))
+                            / (len(a)+len(b)-2))
+        d = (b.mean() - a.mean()) / pooled_sd
         lines.append(
-            f"{dim}: n_{side_a}={len(a)}, n_{side_b}={len(b)}  "
-            f"Mean {side_a}={a.mean():.3f}, Mean {side_b}={b.mean():.3f}  "
-            f"p={p_val:.3g}, Cohen's d={cohen_d:.2f}"
+            f"{dim}: Mean {a_lbl}={a.mean():.3f}, {b_lbl}={b.mean():.3f} "
+            f"(p={p:.3g}, d={d:.2f}, n={len(a)} vs {len(b)})"
         )
-        results[dim] = {"p": p_val, "d": cohen_d}
 
-    # ---- 3. save -----------------------------------------------------------
     os.makedirs(plots_path, exist_ok=True)
-    txt = os.path.join(plots_path, f"{slice_suffix}_defection_dichos.txt")
-    with open(txt, "w") as f:
+    with open(os.path.join(plots_path, f"{label}_defection_dichos.txt"), "w") as f:
         f.write("\n".join(lines))
-    return results
 
 
-
-# ---------------------------------------------------------------------
-# 2.  TRUTHFULNESS ANALYSIS  (0–1 proportion of truthful statements)
-# ---------------------------------------------------------------------
 def get_truthfulness_dichos(
-    df_agents: pd.DataFrame,
-    plots_path: Union[str, os.PathLike],
-    df_type: Optional[str] = None,
-) -> Dict[str, Dict[str, float]]:
-    """
-    Welch t‑tests and Cohen’s d for per‑agent *Truthfulness* rates
-    across each MBTI dichotomy.
-    """
-    slice_by = {"game": "GameName", "model": "Model"}.get(df_type)
-    slice_suffix = slice_by if slice_by else "pooled"
-
-    # ---- 0. collapse to per‑agent (+ slice) rows ---------------------------
-    group_cols = ["Agent", "Personality", "I/E", "N/S", "T/F", "J/P"]
-    if slice_by:
-        group_cols.insert(1, slice_by)
-
-    agent_means = (
-        df_agents
-        .groupby(group_cols, as_index=False)["Truthfulness"]
-        .mean()
-        .dropna(subset=["Truthfulness"])
-    )
-
-    # ---- 1. Welch t for dichotomies ---------------------------------------
-    dichos = {"I/E": ("I", "E"),
-              "N/S": ("N", "S"),
-              "T/F": ("T", "F"),
-              "J/P": ("J", "P")}
-    lines, results = [], {}
-    for dim, (side_a, side_b) in dichos.items():
-        a = agent_means.loc[agent_means[dim] == side_a, "Truthfulness"].values
-        b = agent_means.loc[agent_means[dim] == side_b, "Truthfulness"].values
-
-        if len(a) < 2 or len(b) < 2:
-            lines.append(f"{dim}: not enough data (n_{side_a}={len(a)}, n_{side_b}={len(b)})")
-            continue
-
-        t_stat, p_val = stats.ttest_ind(a, b, equal_var=False)
-        pooled_sd = np.sqrt(
-            ((a.var(ddof=1) * (len(a) - 1)) + (b.var(ddof=1) * (len(b) - 1)))
-            / (len(a) + len(b) - 2)
-        )
-        cohen_d = (b.mean() - a.mean()) / pooled_sd
-
-        lines.append(
-            f"{dim}: n_{side_a}={len(a)}, n_{side_b}={len(b)}  "
-            f"Mean {side_a}={a.mean():.3f}, Mean {side_b}={b.mean():.3f}  "
-            f"p={p_val:.3g}, Cohen's d={cohen_d:.2f}"
-        )
-        results[dim] = {"p": p_val, "d": cohen_d}
-
-    # ---- 2. save -----------------------------------------------------------
-    os.makedirs(plots_path, exist_ok=True)
-    txt = os.path.join(plots_path, f"{slice_suffix}_truthfulness_dichos.txt")
-    with open(txt, "w") as f:
-        f.write("\n".join(lines))
-    return results
-
-def get_strategy_switch_pvalues(
-    df_agents: pd.DataFrame,
+    df: pd.DataFrame,
     plots_path: str | os.PathLike,
     df_type: str | None = None,
-) -> Dict[str, Dict[str, float]]:
+):
+    import numpy as np, os
+    from scipy import stats
 
-    # ------------------------------------------------------------------
-    # 0. Housekeeping
-    # ------------------------------------------------------------------
-    slice_by = "GameName" if df_type == "game" else "Model"
-    df = df_agents.rename(columns={"StrategySwitches": "Switches"}).copy()
+    slice_by = _get_slice_col(df_type)
+    label    = slice_by if slice_by else "pooled"
 
-    needed = {"Agent", "Personality", "T/F", slice_by, "Switches"}
-    missing = needed - set(df.columns)
-    if missing:
-        raise KeyError(f"df_agents missing columns: {missing}")
+    g_cols = ["Personality", "I/E", "N/S", "T/F", "J/P"]
+    if slice_by:
+        g_cols.insert(0, slice_by)
 
-    # ------------------------------------------------------------------
-    # 1A. Agent × slice (independent observations)
-    # ------------------------------------------------------------------
-    agent_slice = (
-        df.groupby(["Agent", "Personality", slice_by, "T/F"], as_index=False)["Switches"]
+    means = (
+        df.groupby(g_cols, as_index=False)["Truthfulness"]
           .mean()
+          .dropna(subset=["Truthfulness"])
     )
 
-    T_a = agent_slice.query("`T/F` == 'T'")["Switches"].values
-    F_a = agent_slice.query("`T/F` == 'F'")["Switches"].values
+    axes = {"I/E": ("I", "E"), "N/S": ("N", "S"), "T/F": ("T", "F"), "J/P": ("J", "P")}
+    lines = []
+    for dim, (a_lbl, b_lbl) in axes.items():
+        a = means.loc[means[dim] == a_lbl, "Truthfulness"].values
+        b = means.loc[means[dim] == b_lbl, "Truthfulness"].values
+        if min(len(a), len(b)) < 2:
+            lines.append(f"{dim}: not enough data (n_{a_lbl}={len(a)}, n_{b_lbl}={len(b)})")
+            continue
+        t, p = stats.ttest_ind(a, b, equal_var=False)
+        pooled_sd = np.sqrt(((a.var(ddof=1)*(len(a)-1)) + (b.var(ddof=1)*(len(b)-1)))
+                            / (len(a)+len(b)-2))
+        d = (b.mean() - a.mean()) / pooled_sd
+        lines.append(
+            f"{dim}: Mean {a_lbl}={a.mean():.3f}, {b_lbl}={b.mean():.3f} "
+            f"(p={p:.3g}, d={d:.2f}, n={len(a)} vs {len(b)})"
+        )
 
-    t_a, p_a = ttest_ind(T_a, F_a, equal_var=False)
-    u_a, p_u_a = mannwhitneyu(T_a, F_a, alternative="two-sided")
-
-    # ------------------------------------------------------------------
-    # 1B. MBTI 8-types pooled per slice
-    # ------------------------------------------------------------------
-    type_slice = (
-        agent_slice.groupby(["Personality", "T/F", slice_by], as_index=False)["Switches"]
-                   .mean()
-    )
-
-    T_flat = np.concatenate(
-        type_slice.query("`T/F` == 'T'").groupby(slice_by)["Switches"].apply(list).values
-    )
-    F_flat = np.concatenate(
-        type_slice.query("`T/F` == 'F'").groupby(slice_by)["Switches"].apply(list).values
-    )
-
-    t_t, p_t = ttest_ind(T_flat, F_flat, equal_var=False)
-    u_t, p_u_t = mannwhitneyu(T_flat, F_flat, alternative="two-sided")
-
-    # ------------------------------------------------------------------
-    # 2. Pack results
-    # ------------------------------------------------------------------
-    mean_T = T_a.mean()
-    mean_F = F_a.mean()
-    direction = "T > F" if mean_T > mean_F else "F > T"
-
-    results = {
-        "agent_slice": {
-            "p_welch": p_a, "p_mwu": p_u_a,
-            "mean_T": mean_T, "mean_F": mean_F,
-            "n_T": len(T_a), "n_F": len(F_a)
-        },
-        "type_slice": {
-            "p_welch": p_t, "p_mwu": p_u_t,
-            "mean_T": T_flat.mean(), "mean_F": F_flat.mean(),
-            "n_T": len(T_flat), "n_F": len(F_flat)
-        }
-    }
-
-    # ------------------------------------------------------------------
-    # 3. Write results to file
-    # ------------------------------------------------------------------
     os.makedirs(plots_path, exist_ok=True)
-    file_path = os.path.join(plots_path, f"strategy_switch_pvalues_by_{slice_by}.txt")
+    with open(os.path.join(plots_path, f"{label}_truthfulness_dichos.txt"), "w") as f:
+        f.write("\n".join(lines))
 
-    with open(file_path, "w") as f:
-        f.write(f"=== Strategy Switch Comparison by T/F across {slice_by}s ===\n\n")
+# ── strategy‑switch dichotomies (concise report) ---------------------------
+def get_strategy_switch_pvalues(
+    df: pd.DataFrame,
+    plots_path: str | os.PathLike,
+    df_type: str | None = None,
+):
+    slice_by = _get_slice_col(df_type)
+    label    = slice_by if slice_by else "Overall"
 
-        f.write(f"---- Agent × {slice_by} (independent units) ----\n")
-        f.write(f"Mean strategy switches:\n")
-        f.write(f"  T: {results['agent_slice']['mean_T']:.2f}\n")
-        f.write(f"  F: {results['agent_slice']['mean_F']:.2f}\n")
-        f.write(f"Welch’s t-test:       p = {results['agent_slice']['p_welch']:.3g}\n")
-        f.write(f"Mann–Whitney U-test:  p = {results['agent_slice']['p_mwu']:.3g}\n\n")
+    df = df.rename(columns={"StrategySwitches": "Switches"}).copy()
 
-        f.write(f"---- 8 T-types vs 8 F-types pooled per {slice_by} ----\n")
-        f.write(f"Mean strategy switches:\n")
-        f.write(f"  T: {results['type_slice']['mean_T']:.2f}\n")
-        f.write(f"  F: {results['type_slice']['mean_F']:.2f}\n")
-        f.write(f"Welch’s t-test:       p = {results['type_slice']['p_welch']:.3g}\n")
-        f.write(f"Mann–Whitney U-test:  p = {results['type_slice']['p_mwu']:.3g}\n\n")
+    # one row   =  Personality  (+ slice)  mean switches across 7 rounds
+    g_cols = ["Personality", "I/E", "N/S", "T/F", "J/P"]
+    if slice_by:
+        g_cols.insert(0, slice_by)
 
-        # ------------------------------------------------------------------
-        # 4. Add correct interpretation sentence
-        # ------------------------------------------------------------------
-        if slice_by == "GameName":
-            f.write(
-                f"We tested whether Thinking (T) agents switch strategies more frequently than "
-                f"Feeling (F) agents across repeated interactions.\n"
-                f"At the agent × game level, {direction.split()[0]} agents exhibited more switching "
-                f"(M = {max(mean_T, mean_F):.2f} vs. {min(mean_T, mean_F):.2f}; Welch’s t, "
-                f"p = {p_a:.3g}), suggesting greater behavioral flexibility in {direction.split()[0]} types.\n\n"
-                f"When pooling the eight T-types and eight F-types within each game, the difference remained "
-                f"(Welch’s t, p = {p_t:.3g}), indicating that this effect is robust across games.\n"
-            )
-        elif slice_by == "Model":
-            f.write(
-                f"We tested whether Thinking (T) agents switch strategies more often than Feeling (F) agents "
-                f"across different model configurations.\n"
-                f"At the agent × model level, {direction.split()[0]} agents switched significantly more often "
-                f"(M = {max(mean_T, mean_F):.2f} vs. {min(mean_T, mean_F):.2f}; Welch’s t, "
-                f"p = {p_a:.3g}).\n"
-                f"Pooling the eight T-types and eight F-types within each model confirmed the pattern "
-                f"(Welch’s t, p = {p_t:.3g}), indicating that this behavioral trend is consistent across models.\n"
-            )
-        else:
-            f.write(
-                f"Across all data, {direction.split()[0]} agents switched strategies more often "
-                f"(M = {max(mean_T, mean_F):.2f} vs. {min(mean_T, mean_F):.2f}; Welch’s t, "
-                f"p = {p_a:.3g}), supporting the hypothesis that {direction.split()[0]} types are more "
-                f"strategically adaptive.\n"
-            )
+    means = (
+        df.groupby(g_cols, as_index=False)["Switches"]
+          .mean()
+          .dropna(subset=["Switches"])
+    )
 
+    axes  = {"I/E": ("I", "E"),
+             "N/S": ("N", "S"),
+             "T/F": ("T", "F"),
+             "J/P": ("J", "P")}
+    lines = []
 
-def _prop_test(count1: int, n1: int, count2: int, n2: int) -> float:
-    """
-    Two-proportion test using Welch's chi-square; if any expected cell < 5
-    switch to Fisher's exact (two-sided).  Returns the p-value.
-    """
-    table = np.array([[count1, n1 - count1],
-                      [count2, n2 - count2]])
-    if (table < 5).any():
-        _, p = fisher_exact(table, alternative="two-sided")
-    else:
-        _, p, _, _ = chi2_contingency(table, correction=False)
-    return p
+    for dim, (a_lbl, b_lbl) in axes.items():
+        a = means.loc[means[dim] == a_lbl, "Switches"].values
+        b = means.loc[means[dim] == b_lbl, "Switches"].values
+        n_a, n_b = len(a), len(b)
 
+        if min(n_a, n_b) < 2:
+            lines.append(f"{dim}: not enough data (n_{a_lbl}={n_a}, n_{b_lbl}={n_b})")
+            continue
 
-from scipy.stats import chi2_contingency, fisher_exact
+        p = ttest_ind(a, b, equal_var=False).pvalue          # Welch p‑value
+        higher = a_lbl if a.mean() > b.mean() else b_lbl
 
+        lines.append(
+            f"{dim}: n_{a_lbl}={n_a}, n_{b_lbl}={n_b}  "
+            f"{a_lbl}={a.mean():.2f}, {b_lbl}={b.mean():.2f}  "
+            f"(Welch p={p:.3g}) — {higher} more switches"
+        )
+
+    # save
+    os.makedirs(plots_path, exist_ok=True)
+    fname = os.path.join(plots_path, f"strategy_switch_pvalues_{label}.txt")
+    with open(fname, "w") as f:
+        f.write("\n".join(lines))
+
+    return lines
 
 # ---------- helper for proportion p-value -----------------------------------
 def _prop_test(x1: int, n1: int, x2: int, n2: int) -> float:
@@ -518,166 +395,428 @@ def _prop_test(x1: int, n1: int, x2: int, n2: int) -> float:
         _, p, _, _ = chi2_contingency(tbl, correction=False)
     return p
 
+from scipy.stats import chi2_contingency, fisher_exact
 
-# ---------- main routine ----------------------------------------------------
+def _prop_test(x1, n1, x2, n2):
+    tab = np.array([[x1, n1 - x1], [x2, n2 - x2]])
+    if (tab < 5).any():
+        return fisher_exact(tab)[1]
+    return chi2_contingency(tab, correction=False)[1]
+
+
 def get_liedfirst_pvalues(
-    df_agents: pd.DataFrame,
+    df: pd.DataFrame,
     plots_path: str | os.PathLike,
-    df_type: Literal["game", "model", "pd", None] = None,
-) -> Dict[str, Dict[str, Dict[str, float]]]:
-    """
-    Compare 'LiedFirst' rates for all four MBTI polarities (I/E, N/S, T/F, J/P).
-    Saves a .txt summary and returns a nested dict of p-values & rates.
-    """
+    df_type: Optional[str] = None,
+):
+    # ------------ 0. slice column ------------------------------------------
+    slice_by = {"game": "GameName", "model": "Model"}.get(df_type)
+    label    = slice_by if slice_by else "Overall"
 
-    # 0 ─── decide slice mode ────────────────────────────────────────────────
-    if df_type == "game":
-        slice_by: str | None = "GameName"
-    elif df_type == "model":
-        slice_by = "Model"
-    else:                            # "pd" or None  →  no slicing
-        slice_by = None
-
-    df = df_agents.copy()
+    df        = df.copy()
     df["LiedFirst"] = df["LiedFirst"].astype(bool)
 
-    # ensure required columns
-    needed = {"Agent", "Personality", "I/E", "N/S", "T/F", "J/P", "LiedFirst"}
+    # ------------ 1. one row per Personality (+ slice) ---------------------
+    g_cols = ["Personality", "I/E", "N/S", "T/F", "J/P"]
     if slice_by:
-        needed.add(slice_by)
-    missing = needed - set(df.columns)
-    if missing:
-        raise KeyError(f"df_agents missing columns: {missing}")
+        g_cols.insert(0, slice_by)
 
-    # helper to analyse one MBTI axis ---------------------------------------
-    def analyse(axis: str, pos: str, neg: str):
-        # group columns (add slice if present)
-        g_cols = ["Agent", "Personality", axis]
-        if slice_by:
-            g_cols.insert(1, slice_by)
+    per_type = df.groupby(g_cols, as_index=False)["LiedFirst"].mean()
 
-        ag = df.groupby(g_cols, as_index=False)["LiedFirst"].mean()  # proportion per agent
+    # ------------ 2. two‑proportion tests for each dichotomy ---------------
+    axes  = {"I/E": ("I", "E"),
+             "N/S": ("N", "S"),
+             "T/F": ("T", "F"),
+             "J/P": ("J", "P")}
+    lines = []
+    for dim, (pos, neg) in axes.items():
+        pos_vals = per_type.loc[per_type[dim] == pos, "LiedFirst"].values
+        neg_vals = per_type.loc[per_type[dim] == neg, "LiedFirst"].values
 
-        # agent-level counts
-        pos_vals = ag.query(f"`{axis}` == @pos")["LiedFirst"]
-        neg_vals = ag.query(f"`{axis}` == @neg")["LiedFirst"]
-        p_ag = _prop_test(pos_vals.sum(), len(pos_vals), neg_vals.sum(), len(neg_vals))
+        n_pos, n_neg = len(pos_vals), len(neg_vals)
+        if min(n_pos, n_neg) == 0:
+            lines.append(f"{dim}: not enough data (n_{pos}={n_pos}, n_{neg}={n_neg})")
+            continue
 
-        # 8-type pooling
-        if slice_by:                          # per slice, then flatten
-            type_slice = (
-                ag.groupby(["Personality", axis, slice_by], as_index=False)["LiedFirst"]
-                  .mean())
-            pos_pool = np.concatenate(
-                type_slice.query(f"`{axis}` == @pos")
-                          .groupby(slice_by)["LiedFirst"].apply(list).values
-            )
-            neg_pool = np.concatenate(
-                type_slice.query(f"`{axis}` == @neg")
-                          .groupby(slice_by)["LiedFirst"].apply(list).values
-            )
-        else:                                 # no slice  →  one row per type
-            type_slice = ag.groupby(["Personality", axis], as_index=False)["LiedFirst"].mean()
-            pos_pool = type_slice.query(f"`{axis}` == @pos")["LiedFirst"].values
-            neg_pool = type_slice.query(f"`{axis}` == @neg")["LiedFirst"].values
+        p = _prop_test(pos_vals.sum(), n_pos, neg_vals.sum(), n_neg)
+        higher = pos if pos_vals.mean() > neg_vals.mean() else neg
 
-        p_type = _prop_test(pos_pool.sum(), len(pos_pool), neg_pool.sum(), len(neg_pool))
+        lines.append(
+            f"{dim}: n_{pos}={n_pos}, n_{neg}={n_neg}  "
+            f"{pos}={pos_vals.mean():.2%}, {neg}={neg_vals.mean():.2%}  "
+            f"(p={p:.3g}) — {higher} more likely to lie first"
+        )
 
-        return {
-            "agent_slice": {
-                "p": p_ag,
-                "rate_pos": pos_vals.mean(),
-                "rate_neg": neg_vals.mean(),
-            },
-            "type_slice": {
-                "p": p_type,
-                "rate_pos": pos_pool.mean(),
-                "rate_neg": neg_pool.mean(),
-            },
-        }
-
-    axes = {"I/E": ("I", "E"),
-            "N/S": ("N", "S"),
-            "T/F": ("T", "F"),
-            "J/P": ("J", "P")}
-
-    results: Dict[str, Dict[str, Dict[str, float]]] = {
-        axis: analyse(axis, *lbls) for axis, lbls in axes.items()
-    }
-
-    # ---------- write TXT report ------------------------------------------
+    # ------------ 3. save ---------------------------------------------------
     os.makedirs(plots_path, exist_ok=True)
-    label = slice_by if slice_by else "Overall"
-    fname = os.path.join(plots_path, f"liedfirst_pvalues_{label}.txt")
+    path = os.path.join(plots_path, f"liedfirst_pvalues_{label}.txt")
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
 
-    with open(fname, "w") as f:
-        f.write(f"=== 'Lied First' Comparison ({label}) ===\n\n")
-        for axis, (pos, neg) in axes.items():
-            ag = results[axis]["agent_slice"]
-            tp = results[axis]["type_slice"]
+    return lines
 
-            higher = pos if ag["rate_pos"] > ag["rate_neg"] else neg
-            lower  = neg if higher == pos else pos
-            f.write(f"-- {axis}: {higher} > {lower} --\n")
-            f.write(f"Agent level : {ag['rate_pos']:.2%} vs {ag['rate_neg']:.2%}  "
-                    f"(p = {ag['p']:.3g})\n")
-            f.write(f"8-type pool: {tp['rate_pos']:.2%} vs {tp['rate_neg']:.2%}  "
-                    f"(p = {tp['p']:.3g})\n")
-
-            if slice_by:
-                qualifier = "robust" if tp["p"] < 0.05 else "weaker"
-                f.write(f"Interpretation: The tendency for {higher} agents to lie first is "
-                        f"{qualifier} across {slice_by.lower()}s.\n\n")
-            else:
-                f.write(f"Interpretation: Across all data, {higher} agents are more likely to "
-                        f"lie first.\n\n")
-
-    print(f"✅ Lied-first report saved to {fname}")
-    return results
-
-    
                     
 #-----------------------------------------------------------------
 ### Plotting functions df
-def plot_boxplot_score_all(df, plots_path, df_type):
-    #TODO
-    pass
+def plot_boxplot_score_all(df_agents, plots_path, df_type):
+    df = df_agents.copy()
+    sns.set(style="whitegrid")
+    plt.figure(figsize=(10, 6))
+    ax = sns.boxplot(
+        data=df,
+        x="Personality",
+        y="TotalScore",
+        order=personality_order,
+        hue="Personality",
+        palette="Set2"
+    )
+    plt.axhline(y=21, color='g', linestyle='--', label='Max by both cooperating: 21')
+    plt.axhline(y=45, color='r', linestyle='--', label='Max by one defecting and other coop: 45')
+    plt.axhline(y=7, color='b', linestyle='--', label='Max by Both Defecting: 7')
+    plt.legend(loc='upper center')
+    ax.set_xlabel("")
+    ax.set_ylabel("Total Score")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+
+    os.makedirs(plots_path, exist_ok=True)
+    file_path = os.path.join(plots_path, "score_boxplot_all.png")
+    plt.savefig(file_path, dpi=300, bbox_inches="tight")
+    plt.close()
 
 def plot_boxplot_score_per_dichotomy(df, plots_path, df_type):
-    #TODO
-    pass
+    df = df.copy()
+    sns.set(style="whitegrid")
+
+    # use a 2x2 grid for the four MBTI dichotomies
+    fig, axes = plt.subplots(2, 2, figsize=(12, 12), sharey=True)
+    axes_flat = axes.flatten()
+    dichotomies = ["I/E", "N/S", "T/F", "J/P"]
+
+    for i, dich in enumerate(dichotomies):
+        ax = axes_flat[i]
+        levels = dich.split("/")
+        sns.boxplot(
+            data=df,
+            x=dich,
+            y="TotalScore",
+            order=levels,
+            palette="Set2",
+            hue=dichotomies[i],
+            ax=ax
+        )
+        # remove legend in each subplot
+        if ax.get_legend():
+            ax.get_legend().remove()
+        ax.set_xlabel(dich)
+        ax.set_ylabel("Total Score" if i == 0 else "")
+
+    plt.tight_layout()
+    os.makedirs(plots_path, exist_ok=True)
+    file_path = os.path.join(plots_path, "score_boxplot_per_dichotomy.png")
+    fig.savefig(file_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
 
 def plot_violin_score_all(df, plots_path, df_type):
-    #TODO
-    pass
+    df = df.copy()
+    # extract the last cumulative score as TotalScore
+    df['TotalScore'] = df['CumulativeScore'].apply(
+        lambda x: x[-1] if isinstance(x, (list, np.ndarray)) and len(x) > 0 else np.nan
+    )
+
+    sns.set(style="whitegrid")
+    plt.figure(figsize=(10, 6))
+    ax = sns.violinplot(
+        data=df,
+        x="Personality",
+        y="TotalScore",
+        order=personality_order,
+        hue="Personality",
+        palette="Set2",
+        inner='quartile'
+    )
+    # horizontal reference lines
+    plt.axhline(y=21, color='g', linestyle='--', label='Max both cooperate: 21')
+    plt.axhline(y=45, color='r', linestyle='--', label='Max one defects: 45')
+    plt.axhline(y=7,  color='b', linestyle='--', label='Max both defect: 7')
+    plt.legend(loc='upper center')
+    ax.set_xlabel("")
+    ax.set_ylabel("Total Score")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+
+    os.makedirs(plots_path, exist_ok=True)
+    file_path = os.path.join(plots_path, "score_violin_all.png")
+    plt.savefig(file_path, dpi=300, bbox_inches="tight")
+    plt.close()
 
 def plot_violin_score_per_dichotomy(df, plots_path, df_type):
-    #TODO
-    pass
+    df = df.copy()
+    sns.set(style="whitegrid")
 
-def plot_cumulative_score_all(df, plots_path, df_type):
-    #TODO
-    pass
+    # arrange subplots in 3 rows x 2 cols (to fit 5 plots)
+    fig, axes = plt.subplots(3, 2, figsize=(10, 14), sharey=True)
+    axes_flat = axes.flatten()
+    dichotomies = ["I/E", "N/S", "T/F", "J/P"]
+
+    # first 4: one violin plot per dichotomypersonality_cumulative_all
+    for i, dich in enumerate(dichotomies):
+        ax = axes_flat[i]
+        levels = dich.split("/")
+        sns.violinplot(
+            data=df,
+            x=dich, y="TotalScore",
+            order=levels,
+            palette="Set2",
+            hue=dichotomies[i],
+            inner='quartile',
+            ax=ax
+        )
+        ax.set_xlabel(dich)
+        if i == 0:
+            ax.set_ylabel("Total Score")
+        else:
+            ax.set_ylabel("")
+
+    # fifth: NONE / ALTRUISTIC / SELFISH
+    other = df[df["Personality"].isin(["NONE", "ALTRUISTIC", "SELFISH"])]
+    ax5 = axes_flat[4]
+    sns.violinplot(
+        data=other,
+        x="Personality", y="TotalScore",
+        order=["NONE", "ALTRUISTIC", "SELFISH"],
+        palette="Set2",
+        hue="Personality",
+        inner='quartile',
+        ax=ax5
+    )
+    ax5.set_xlabel("Other")
+    ax5.set_ylabel("")
+
+    # turn off the unused subplot (6th)
+    axes_flat[5].axis("off")
+
+    plt.tight_layout()
+    os.makedirs(plots_path, exist_ok=True)
+    file_path = os.path.join(plots_path, "score_violin_per_dichotomy.png")
+    fig.savefig(file_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+def plot_line_cumulative_score_all(df, plots_path, df_type):
+    df = df.copy()
+    #create a dict with {Personality: [round0:[CumulativeScore], round1:[CumulativeScore], ...]}
+    personality_cumulative_all = {}
+    personality_cumulative_means = {}
+    #then take the mean of the list of CumulativeScores for each round
+    for personality in personality_order:
+        personality_cumulative_all[personality] = []
+    for index, row in df.iterrows():
+        personality = row['Personality']
+        if personality not in personality_order:
+            continue
+        cumulative_scores = row['CumulativeScore']
+        for round_index, score in enumerate(cumulative_scores):
+            if len(personality_cumulative_all[personality]) <= round_index:
+                personality_cumulative_all[personality].append([])
+            personality_cumulative_all[personality][round_index].append(score)
+    for personality, scores in personality_cumulative_all.items():
+        personality_cumulative_means[personality] = [np.mean(round_scores) for round_scores in scores]
+    #create a df with the means
+    df_means = pd.DataFrame.from_dict(personality_cumulative_means, orient='index').T
+    df_means.columns = personality_order
+    df_means.index = [f"Round {i}" for i in range(len(df_means))]
+    #plot
+    sns.set(style="whitegrid")
+    plt.figure(figsize=(10, 6))
+    ax = sns.lineplot(data=df_means, palette="tab20", linewidth=1.5, dashes=False)
+
+    # Legend outside the plot to the right
+    plt.legend(
+        title="Personality",
+        bbox_to_anchor=(1.05, 1),  # x=1.05 pushes it outside
+        loc='upper left',
+        borderaxespad=0.
+    )
+
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Cumulative Score")
+    plt.xticks(rotation=45, ha="right")
+    plt.title("Cumulative Score by Personality")
+    plt.tight_layout(rect=[0, 0, 0.85, 1])  # Make room on right for legend
+
+    file_path = os.path.join(plots_path, "cumulative_line_score_all.png")
+    plt.savefig(file_path, dpi=300, bbox_inches="tight")
+    plt.close()
 
 def plot_truth_bar_all(df, plots_path, df_type):
-    #TODO
-    pass
+    """
+    Bar plot of the *mean* Truthfulness for every personality.
+    """
+    df = df.copy()
 
+    # Aggregate
+    means = (
+        df.groupby("Personality", as_index=False)["Truthfulness"]
+          .mean()
+          .set_index("Personality")
+          .reindex(personality_order)        # keeps custom order
+    )
+
+    # Plot
+    sns.set(style="whitegrid")
+    plt.figure(figsize=(10, 6))
+    ax = sns.barplot(
+        data=means.reset_index(),
+        x="Personality",
+        y="Truthfulness",
+        order=personality_order,
+        hue="Personality",
+        palette="Set2"
+    )
+    ax.set_xlabel("")
+    ax.set_ylabel("Mean Truthfulness")
+    plt.xticks(rotation=45, ha="right")
+    plt.title("Mean Truthfulness by Personality")
+    plt.tight_layout()
+
+    # Save
+    os.makedirs(plots_path, exist_ok=True)
+    fname = os.path.join(plots_path, f"truth_bar_all.png")
+    plt.savefig(fname, dpi=300, bbox_inches="tight")
+    plt.close()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 2. Boxplot – Truthfulness distribution per personality
+# ──────────────────────────────────────────────────────────────────────────────
 def plot_truth_box_all(df, plots_path, df_type):
-    #TODO
-    pass
+    """
+    Box‑and‑whisker plot of Truthfulness for every personality.
+    """
+    df = df.copy()
+    sns.set(style="whitegrid")
+    plt.figure(figsize=(10, 6))
+    ax = sns.boxplot(
+        data=df,
+        x="Personality",
+        y="Truthfulness",
+        order=personality_order,
+        hue="Personality",
+        palette="Set2"
+    )
+    leg = ax.get_legend()          # <- safe check
+    if leg is not None:
+        leg.remove()
+    ax.set_xlabel("")
+    ax.set_ylabel("Truthfulness")
+    plt.xticks(rotation=45, ha="right")
+    plt.title("Truthfulness Distribution by Personality")
+    plt.tight_layout()
 
+    os.makedirs(plots_path, exist_ok=True)
+    fname = os.path.join(plots_path, f"truth_box_all.png")
+    plt.savefig(fname, dpi=300, bbox_inches="tight")
+    plt.close()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 3. Violin plots – Truthfulness per MBTI dichotomy
+# ──────────────────────────────────────────────────────────────────────────────
 def plot_truth_violin_dichotomy(df, plots_path, df_type):
-    #TODO
-    pass
+    """
+    Creates a 3×2 grid of violin plots (four dichotomies + 'NONE/ALTRUISTIC/SELFISH')
+    for the Truthfulness variable.
+    """
+    df = df.copy()
+    sns.set(style="whitegrid")
 
+    fig, axes = plt.subplots(3, 2, figsize=(12, 16), sharey=True)
+    axes_flat = axes.flatten()
+    dichotomies = ["I/E", "N/S", "T/F", "J/P"]
+
+    # 1–4 ─ each MBTI dichotomy
+    for i, dich in enumerate(dichotomies):
+        ax = axes_flat[i]
+        levels = [lvl for lvl in dich.split("/") if lvl in df[dich].unique()]
+        sns.violinplot(
+            data=df,
+            x=dich,
+            y="Truthfulness",
+            order=levels,
+            palette="Set2",
+            hue=dich,             # colour by level (e.g. I vs E)
+            ax=ax,
+            inner="quartile"
+        )
+        leg = ax.get_legend()
+        if leg is not None:
+            leg.remove()
+        ax.set_xlabel(dich)
+        ax.set_ylabel("Truthfulness" if i == 0 else "")
+
+    # 5 ─ special group
+    other = df[df["Personality"].isin(["NONE", "ALTRUISTIC", "SELFISH"])]
+    ax5 = axes_flat[4]
+    sns.violinplot(
+        data=other,
+        x="Personality",
+        y="Truthfulness",
+        order=["NONE", "ALTRUISTIC", "SELFISH"],
+        palette="Set2",
+        hue="Personality",
+        ax=ax5,
+        inner="quartile"
+    )
+    leg = ax.get_legend()
+    if leg is not None:
+        leg.remove()
+    ax5.set_xlabel("Other")
+    ax5.set_ylabel("")
+
+    # turn off unused subplot (index 5)
+    axes_flat[5].axis("off")
+
+    plt.tight_layout()
+    os.makedirs(plots_path, exist_ok=True)
+    fname = os.path.join(plots_path, f"truth_violin_dichotomy.png")
+    fig.savefig(fname, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 4. Violin plot – Truthfulness for I vs E only
+# ──────────────────────────────────────────────────────────────────────────────
 def plot_truth_violin_dichotomy_IE(df, plots_path, df_type):
-    #TODO
-    pass
+    """
+    Single violin plot comparing Truthfulness for the I/E dichotomy only.
+    Rows where `I/E` is None/NaN are ignored.
+    """
+    df = df.copy()
+    df = df[df["I/E"].isin(["I", "E"])].dropna(subset=["I/E"])   # keep only valid I or E
+    sns.set(style="whitegrid")
 
-def plot_who_lied_all(df, plots_path, df_type):
-    #TODO
-    pass
+    plt.figure(figsize=(8, 6))
+    ax = sns.violinplot(
+        data=df,
+        x="I/E",
+        y="Truthfulness",
+        order=["I", "E"],
+        palette="Set2",
+        hue="I/E",
+        inner="quartile"
+    )
+    leg = ax.get_legend()
+    if leg is not None:
+        leg.remove()
+    ax.set_xlabel("I / E")
+    ax.set_ylabel("Truthfulness")
+    plt.title("Truthfulness by I/E Dichotomy")
+    plt.tight_layout()
+
+    os.makedirs(plots_path, exist_ok=True)
+    fname = os.path.join(plots_path, f"truth_violin_IE.png")
+    plt.savefig(fname, dpi=300, bbox_inches="tight")
+    plt.close()
 
 ### Plotting functions df_agents
 
@@ -707,7 +846,7 @@ def plot_defection_rate_bar_dichotomy(df_agents: pd.DataFrame, plots_path, df_ty
     # 3. plotting -----------------------------------------------------------------------
     sns.set(style="whitegrid")
     plt.rcParams.update({'font.size': 14})
-    plt.rcParams['figure.figsize'] = [10, 6]
+    plt.rcParams['figure.figsize'] = [8, 6]
 
     fig, axes = plt.subplots(2, 2, sharey=True)
     axes = axes.flatten()
@@ -777,7 +916,10 @@ def plot_defection_rate_bar_all(df_agents: pd.DataFrame, plots_path: str | os.Pa
     ax.set_title("Mean defection rate by MBTI personality")
     ax.set_xlabel("")
     ax.set_ylabel("Mean defect rate")
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+   # Option A – preferred
+    ax.tick_params(axis="x", rotation=45)
+    for lbl in ax.get_xticklabels():
+        lbl.set_ha("right")
 
     fig.tight_layout()
 
@@ -830,7 +972,7 @@ def plot_truth_strip_dichotomy(df_agents, plots_path, df_type):
 def plot_truth_by_round(df_agents, plots_path, df_type):
     # Prepare the data for plotting
     df_agents = df_agents.copy()
-    df_agents['Round'] = df_agents['CumulativeScores'].apply(lambda x: list(range(len(x))))
+    df_agents['Round'] = df_agents['CumulativeScore'].apply(lambda x: list(range(len(x))))
     df_agents['TruthfulByRound'] = df_agents.apply(lambda row: list(zip(row['Round'], row['Truthful'])), axis=1)
 
     # Explode the data to have one row per round
@@ -979,13 +1121,15 @@ def plot_truthfulness_by_df_type_dichotomies(df_agents, plots_path, df_type):
         ax.tick_params(axis="x", rotation=45)
 
     # ----- legends --------------------------------------------------------
-    _legend_alias(fig, MODEL_ALIAS, max_columns=4)
+    if df_type == "model":
+        _legend_alias(fig, MODEL_ALIAS, max_columns=4)
     _legend_mbti(fig)
 
     # leave space for legends (auto: plenty for two lines)
     fig.subplots_adjust(top=1.18)
     fig.tight_layout(rect=[0, 0, 1, 1.15])
-
+    # remove any super-title
+    fig.suptitle("")
     fig.savefig(f"{plots_path}truthfulness_by_{slice_by}_dichotomies.png",
                 dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -1015,7 +1159,7 @@ def plot_truthfulness_by_df_type_IE(df_agents, plots_path, df_type):
     _legend_above(fig, title="Introversion / Extraversion", ncol=2)
 
     fig.tight_layout(rect=[0, 0, 1, 0.99])
-    fig.savefig(f"{plots_path}truthfulness_{slice_by}_I_E.png",
+    fig.savefig(f"{plots_path}truthfulness_bar_I_E.png",
                 dpi=300, bbox_inches="tight")
     plt.close(fig)
     
@@ -1043,11 +1187,10 @@ def plot_truthfulness_violin_by_df_typ(df_agents, plots_path, df_type):
         ax.set(
             xlabel="I/E",
             ylabel="Truthfulness",
-            title=f"Truthfulness for {slice_value}"
         )
         ax.tick_params(axis="x")
         plt.tight_layout()
-        plt.savefig(f"{plots_path}truthfulness_{slice_value}_I_E.png", dpi=300, bbox_inches="tight")
+        plt.savefig(f"{plots_path}truthfulness_violin_{slice_value}_I_E.png", dpi=300, bbox_inches="tight")
         plt.close(fig)
 
 def plot_mean_truthfulness_by_df_type(df_agents, plots_path, df_type):
@@ -1055,7 +1198,10 @@ def plot_mean_truthfulness_by_df_type(df_agents, plots_path, df_type):
     if df_type == "pd":
         return
     slice_by = "Model" if df_type == "model" else "GameName"
-    sns.barplot(data=df_agents, x=slice_by, y='Truthfulness', palette='Set2')
+    sns.barplot(data=df_agents, x=slice_by, y='Truthfulness', palette='Set2',hue=slice_by)
+    ax = plt.gca()
+    if ax.get_legend() is not None:
+        ax.get_legend().remove()
     plt.xlabel(f'{slice_by}')
     plt.ylabel('Truthfulness Percentage')
     plt.xticks(rotation=45, ha='right')
@@ -1095,7 +1241,7 @@ def plot_strategy_switches_by_df_type_TF(df_agents, plots_path, df_type):
         plt.savefig(os.path.join(plots_path, f'strategy_switches_{slice_name}_TF.png'), dpi=300)
         plt.close()
         
-def plot_who_lied_first(df_agents, plots_path, df_type):
+def plot_who_lied_first_count_all(df_agents, plots_path, df_type):
     #TODO:adapt to free will
     df_agents = df_agents.copy()
     max_possible_lies = df_agents["LiedFirst"].sum()
@@ -1117,6 +1263,9 @@ def plot_who_lied_first(df_agents, plots_path, df_type):
         ax=ax
     )
     ax.set_ylabel("Proportion Lied First")
+    ax.tick_params(axis='x', rotation=45)
+    for lbl in ax.get_xticklabels():
+        lbl.set_ha('right')
     #set y limit
     ax.set_ylim(0, 1)
 
@@ -1125,6 +1274,11 @@ def plot_who_lied_first(df_agents, plots_path, df_type):
     file_path = os.path.join(plots_path, "who_lied_first.png")
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
+    
+def plot_who_lied_first_proportion_dichotomy(df_agents, plots_path, df_type):
+    #TODO
+    pass
+    
 
 def plot_who_lied_first_IE_TF(df_agents, plots_path, df_type):
     #TODO: adapt o free will
@@ -1148,7 +1302,7 @@ def plot_who_lied_first_IE_TF(df_agents, plots_path, df_type):
         ax=ax
     )
     ax.set_ylabel("Count Lied First")
-    ax.tick_params(axis='x', rotation=45)
+    ax.tick_params(axis='x')
     # save
     os.makedirs(plots_path, exist_ok=True)
     file_path = os.path.join(plots_path, "who_lied_first_IE.png")
@@ -1195,20 +1349,21 @@ def PD_plots():
     df, plots_path = import_df_and_plot_path(df_type)
 
     df_agents_og = import_df_agents(df)
-    
     # possible plotting functions
-    df_functions = [
-        plot_boxplot_score_all,
-        plot_violin_score_all,
-        plot_violin_score_per_dichotomy,
-        plot_cumulative_score_all,
+    #df_functions = [
+    #    get_liedfirst_pvalues,
+    #]
+    df_functions=[]
+    df_agent_functions = [
         plot_truth_bar_all,
+        plot_truth_box_all,
         plot_truth_violin_dichotomy,
         plot_truth_violin_dichotomy_IE,
-        plot_who_lied_all,
-        get_liedfirst_pvalues,
-    ]
-    df_agent_functions = [
+        plot_boxplot_score_all,
+        plot_boxplot_score_per_dichotomy,
+        plot_violin_score_all,
+        plot_violin_score_per_dichotomy,
+        plot_line_cumulative_score_all,
         plot_defection_rate_bar_all,
         plot_defection_rate_bar_dichotomy,
         get_defection_rates_dichos,
@@ -1218,6 +1373,7 @@ def PD_plots():
         get_liedfirst_pvalues,
         plot_who_lied_first,
         plot_who_lied_first_IE_TF,
+        get_strategy_switch_pvalues,
     ]
     # Run the plotting functions
     plot_from_list(df, plots_path, df_functions, df_type)
@@ -1229,20 +1385,16 @@ def model_plots():
     df, plots_path = import_df_and_plot_path(df_type)
 
     df_agents_og = import_df_agents(df)
-    
-    # possible plotting functions
-    df_functions = [
-        plot_boxplot_score_all,
-        plot_violin_score_all,
-        plot_violin_score_per_dichotomy,
-        plot_cumulative_score_all,
+    df_agent_functions = [
         plot_truth_bar_all,
+        plot_truth_box_all,
         plot_truth_violin_dichotomy,
         plot_truth_violin_dichotomy_IE,
-        plot_who_lied_all,
-        
-    ]
-    df_agent_functions = [
+        plot_boxplot_score_all,
+        plot_boxplot_score_per_dichotomy,
+        plot_violin_score_all,
+        plot_violin_score_per_dichotomy,
+        plot_line_cumulative_score_all,
         plot_defection_rate_bar_all,
         plot_defection_rate_bar_dichotomy,
         get_defection_rates_dichos,
@@ -1260,7 +1412,6 @@ def model_plots():
         plot_who_lied_first_IE_TF,
     ]
     # Run the plotting functions
-    plot_from_list(df, plots_path, df_functions, df_type)
     plot_from_list(df_agents_og, plots_path, df_agent_functions, df_type)
 
 def game_plots():
@@ -1270,18 +1421,11 @@ def game_plots():
 
     df_agents_og = import_df_agents(df)
     
-    # possible plotting functions
-    df_functions = [
-        plot_boxplot_score_all,
-        plot_violin_score_all,
-        plot_violin_score_per_dichotomy,
-        plot_cumulative_score_all,
+    df_agent_functions = [
         plot_truth_bar_all,
+        plot_truth_box_all,
         plot_truth_violin_dichotomy,
         plot_truth_violin_dichotomy_IE,
-        plot_who_lied_all
-    ]
-    df_agent_functions = [
         plot_truth_strip_dichotomy,
         get_truthfulness_dichos,
         plot_truth_by_round,
@@ -1295,8 +1439,6 @@ def game_plots():
         plot_who_lied_first,
         plot_who_lied_first_IE_TF,
     ]
-    # Run the plotting functions
-    plot_from_list(df, plots_path, df_functions)
     plot_from_list(df_agents_og, plots_path, df_agent_functions, df_type)
 
 if __name__ == '__main__':
@@ -1311,7 +1453,7 @@ if __name__ == '__main__':
     plt.rcParams['figure.figsize'] = [10, 6]
 
     PD_plots()
-    #model_plots()
+    model_plots()
     game_plots()
 
     
