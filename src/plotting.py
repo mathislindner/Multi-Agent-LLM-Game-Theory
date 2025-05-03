@@ -57,6 +57,39 @@ MODEL_ALIAS = {
     "deepseek-chat":                  "DeepSeek",
 }
 
+PALETTE_BY_PAIR = {
+    "I/E": sns.color_palette("Blues",   2),
+    "N/S": sns.color_palette("Greens",  2),
+    "T/F": sns.color_palette("Oranges", 2),
+    "J/P": sns.color_palette("Purples", 2),
+}
+HUE_COLOUR = {
+    "I": PALETTE_BY_PAIR["I/E"][0], "E": PALETTE_BY_PAIR["I/E"][1],
+    "N": PALETTE_BY_PAIR["N/S"][0], "S": PALETTE_BY_PAIR["N/S"][1],
+    "T": PALETTE_BY_PAIR["T/F"][0], "F": PALETTE_BY_PAIR["T/F"][1],
+    "J": PALETTE_BY_PAIR["J/P"][0], "P": PALETTE_BY_PAIR["J/P"][1],
+}
+
+
+PALETTE_BY_TYPE = {
+    "INTJ": "#1f77b4", "INTP": "#ff7f0e", "ENTJ": "#2ca02c", "ENTP": "#d62728",
+    "INFJ": "#9467bd", "INFP": "#8c564b", "ENFJ": "#e377c2", "ENFP": "#7f7f7f",
+    "ISTJ": "#bcbd22", "ISFJ": "#17becf", "ESTJ": "#aec7e8", "ESFJ": "#ffbb78",
+    "ISTP": "#98df8a", "ISFP": "#ff9896", "ESTP": "#c5b0d5", "ESFP": "#c49c94"
+}
+PALETTE_BY_TYPE.update({
+    "NONE": (0.5, 0.5, 0.5),
+    "ALTRUISTIC": (0.5, 0.5, 0.5),
+    "SELFISH": (0.5, 0.5, 0.5)
+})
+
+LABEL_FULL = {
+    "I": "Introversion", "E": "Extraversion",
+    "N": "Intuition",    "S": "Sensing",
+    "T": "Thinking",     "F": "Feeling",
+    "J": "Judging",      "P": "Perceiving",
+}
+
 def who_lied_first(df: pd.DataFrame) -> pd.DataFrame:
     """
     Add two columns:
@@ -462,17 +495,20 @@ def plot_boxplot_score_all(df_agents, plots_path, df_type):
     df = df_agents.copy()
     sns.set(style="whitegrid")
     plt.figure(figsize=(10, 6))
+    
     ax = sns.boxplot(
         data=df,
         x="Personality",
         y="TotalScore",
         order=personality_order,
         hue="Personality",
-        palette="Set2"
+        palette=PALETTE_BY_TYPE
     )
-    plt.axhline(y=21, color='g', linestyle='--', label='Max by both cooperating: 21')
-    plt.axhline(y=45, color='r', linestyle='--', label='Max by one defecting and other coop: 45')
-    plt.axhline(y=7, color='b', linestyle='--', label='Max by Both Defecting: 7')
+    
+    plt.axhline(y=21, color='g', linestyle='--', label='Max if both cooperate: 21')
+    plt.axhline(y=45, color='r', linestyle='--', label='Max if one defects: 45')
+    plt.axhline(y=7, color='b', linestyle='--', label='Max if both defect: 7')
+    
     plt.legend(loc='upper center')
     ax.set_xlabel("")
     ax.set_ylabel("Total Score")
@@ -484,42 +520,50 @@ def plot_boxplot_score_all(df_agents, plots_path, df_type):
     plt.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close()
 
+
 def plot_boxplot_score_per_dichotomy(df, plots_path, df_type):
     df = df.copy()
-    sns.set(style="whitegrid")
+    sns.set(style="whitegrid", context="talk")
 
-    # use a 2x2 grid for the four MBTI dichotomies
-    fig, axes = plt.subplots(2, 2, figsize=(12, 12), sharey=True)
+    # Define MBTI dichotomies and their levels
+    dichotomy_pairs = [("I/E", ["I", "E"]),
+                       ("N/S", ["N", "S"]),
+                       ("T/F", ["T", "F"]),
+                       ("J/P", ["J", "P"])]
+
+    # Ensure output path exists
+    os.makedirs(plots_path, exist_ok=True)
+
+    # Create 2x2 grid of subplots
+    fig, axes = plt.subplots(2, 2, figsize=(8, 8), sharey=True)
     axes_flat = axes.flatten()
-    dichotomies = ["I/E", "N/S", "T/F", "J/P"]
 
-    for i, dich in enumerate(dichotomies):
+    for i, (dich, levels) in enumerate(dichotomy_pairs):
         ax = axes_flat[i]
-        levels = dich.split("/")
         sns.boxplot(
             data=df,
             x=dich,
             y="TotalScore",
             order=levels,
-            palette="Set2",
-            hue=dichotomies[i],
+            hue=dich,
+            hue_order=levels,
+            palette=[HUE_COLOUR[level] for level in levels],
             ax=ax
         )
-        # remove legend in each subplot
+        # remove individual legends
         if ax.get_legend():
             ax.get_legend().remove()
         ax.set_xlabel(dich)
         ax.set_ylabel("Total Score" if i == 0 else "")
 
     plt.tight_layout()
-    os.makedirs(plots_path, exist_ok=True)
     file_path = os.path.join(plots_path, "score_boxplot_per_dichotomy.png")
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
+
 def plot_violin_score_all(df, plots_path, df_type):
     df = df.copy()
-    # extract the last cumulative score as TotalScore
     df['TotalScore'] = df['CumulativeScore'].apply(
         lambda x: x[-1] if isinstance(x, (list, np.ndarray)) and len(x) > 0 else np.nan
     )
@@ -532,10 +576,9 @@ def plot_violin_score_all(df, plots_path, df_type):
         y="TotalScore",
         order=personality_order,
         hue="Personality",
-        palette="Set2",
+        palette=PALETTE_BY_TYPE,
         inner='quartile'
     )
-    # horizontal reference lines
     plt.axhline(y=21, color='g', linestyle='--', label='Max both cooperate: 21')
     plt.axhline(y=45, color='r', linestyle='--', label='Max one defects: 45')
     plt.axhline(y=7,  color='b', linestyle='--', label='Max both defect: 7')
@@ -550,50 +593,53 @@ def plot_violin_score_all(df, plots_path, df_type):
     plt.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close()
 
+
 def plot_violin_score_per_dichotomy(df, plots_path, df_type):
     df = df.copy()
     sns.set(style="whitegrid")
 
-    # arrange subplots in 3 rows x 2 cols (to fit 5 plots)
     fig, axes = plt.subplots(3, 2, figsize=(10, 14), sharey=True)
     axes_flat = axes.flatten()
     dichotomies = ["I/E", "N/S", "T/F", "J/P"]
 
-    # first 4: one violin plot per dichotomypersonality_cumulative_all
     for i, dich in enumerate(dichotomies):
         ax = axes_flat[i]
         levels = dich.split("/")
         sns.violinplot(
             data=df,
-            x=dich, y="TotalScore",
+            x=dich,
+            y="TotalScore",
             order=levels,
-            palette="Set2",
-            hue=dichotomies[i],
+            hue=dich,
+            hue_order=levels,
+            palette=[HUE_COLOUR[level] for level in levels],
             inner='quartile',
             ax=ax
         )
         ax.set_xlabel(dich)
-        if i == 0:
-            ax.set_ylabel("Total Score")
-        else:
-            ax.set_ylabel("")
+        ax.set_ylabel("Total Score" if i == 0 else "")
+        if ax.get_legend():
+            ax.get_legend().remove()
 
-    # fifth: NONE / ALTRUISTIC / SELFISH
+    # Plot for special personalities
     other = df[df["Personality"].isin(["NONE", "ALTRUISTIC", "SELFISH"])]
     ax5 = axes_flat[4]
     sns.violinplot(
         data=other,
-        x="Personality", y="TotalScore",
+        x="Personality",
+        y="TotalScore",
         order=["NONE", "ALTRUISTIC", "SELFISH"],
-        palette="Set2",
         hue="Personality",
+        palette={k: PALETTE_BY_TYPE[k] for k in ["NONE", "ALTRUISTIC", "SELFISH"]},
         inner='quartile',
         ax=ax5
     )
     ax5.set_xlabel("Other")
     ax5.set_ylabel("")
+    if ax5.get_legend():
+        ax5.get_legend().remove()
 
-    # turn off the unused subplot (6th)
+    # Hide empty subplot
     axes_flat[5].axis("off")
 
     plt.tight_layout()
@@ -601,6 +647,7 @@ def plot_violin_score_per_dichotomy(df, plots_path, df_type):
     file_path = os.path.join(plots_path, "score_violin_per_dichotomy.png")
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
+
 
 def plot_line_cumulative_score_all(df, plots_path, df_type):
     df = df.copy()
@@ -654,15 +701,13 @@ def plot_truth_bar_all(df, plots_path, df_type):
     """
     df = df.copy()
 
-    # Aggregate
     means = (
         df.groupby("Personality", as_index=False)["Truthfulness"]
           .mean()
           .set_index("Personality")
-          .reindex(personality_order)        # keeps custom order
+          .reindex(personality_order)
     )
 
-    # Plot
     sns.set(style="whitegrid")
     plt.figure(figsize=(10, 6))
     ax = sns.barplot(
@@ -671,7 +716,7 @@ def plot_truth_bar_all(df, plots_path, df_type):
         y="Truthfulness",
         order=personality_order,
         hue="Personality",
-        palette="Set2"
+        palette=PALETTE_BY_TYPE
     )
     ax.set_xlabel("")
     ax.set_ylabel("Mean Truthfulness")
@@ -679,11 +724,11 @@ def plot_truth_bar_all(df, plots_path, df_type):
     plt.title("Mean Truthfulness by Personality")
     plt.tight_layout()
 
-    # Save
     os.makedirs(plots_path, exist_ok=True)
-    fname = os.path.join(plots_path, f"truth_bar_all.png")
+    fname = os.path.join(plots_path, "truth_bar_all.png")
     plt.savefig(fname, dpi=300, bbox_inches="tight")
     plt.close()
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -702,9 +747,9 @@ def plot_truth_box_all(df, plots_path, df_type):
         y="Truthfulness",
         order=personality_order,
         hue="Personality",
-        palette="Set2"
+        palette=PALETTE_BY_TYPE
     )
-    leg = ax.get_legend()          # <- safe check
+    leg = ax.get_legend()
     if leg is not None:
         leg.remove()
     ax.set_xlabel("")
@@ -714,14 +759,10 @@ def plot_truth_box_all(df, plots_path, df_type):
     plt.tight_layout()
 
     os.makedirs(plots_path, exist_ok=True)
-    fname = os.path.join(plots_path, f"truth_box_all.png")
+    fname = os.path.join(plots_path, "truth_box_all.png")
     plt.savefig(fname, dpi=300, bbox_inches="tight")
     plt.close()
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# 3. Violin plots – Truthfulness per MBTI dichotomy
-# ──────────────────────────────────────────────────────────────────────────────
 def plot_truth_violin_dichotomy(df, plots_path, df_type):
     """
     Creates a 3×2 grid of violin plots (four dichotomies + 'NONE/ALTRUISTIC/SELFISH')
@@ -743,8 +784,9 @@ def plot_truth_violin_dichotomy(df, plots_path, df_type):
             x=dich,
             y="Truthfulness",
             order=levels,
-            palette="Set2",
-            hue=dich,             # colour by level (e.g. I vs E)
+            hue=dich,
+            hue_order=levels,
+            palette=[HUE_COLOUR[lvl] for lvl in levels],
             ax=ax,
             inner="quartile"
         )
@@ -762,12 +804,12 @@ def plot_truth_violin_dichotomy(df, plots_path, df_type):
         x="Personality",
         y="Truthfulness",
         order=["NONE", "ALTRUISTIC", "SELFISH"],
-        palette="Set2",
         hue="Personality",
+        palette={k: PALETTE_BY_TYPE[k] for k in ["NONE", "ALTRUISTIC", "SELFISH"]},
         ax=ax5,
         inner="quartile"
     )
-    leg = ax.get_legend()
+    leg = ax5.get_legend()
     if leg is not None:
         leg.remove()
     ax5.set_xlabel("Other")
@@ -778,21 +820,19 @@ def plot_truth_violin_dichotomy(df, plots_path, df_type):
 
     plt.tight_layout()
     os.makedirs(plots_path, exist_ok=True)
-    fname = os.path.join(plots_path, f"truth_violin_dichotomy.png")
+    fname = os.path.join(plots_path, "truth_violin_dichotomy.png")
     fig.savefig(fname, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 4. Violin plot – Truthfulness for I vs E only
-# ──────────────────────────────────────────────────────────────────────────────
+
 def plot_truth_violin_dichotomy_IE(df, plots_path, df_type):
     """
     Single violin plot comparing Truthfulness for the I/E dichotomy only.
     Rows where `I/E` is None/NaN are ignored.
     """
     df = df.copy()
-    df = df[df["I/E"].isin(["I", "E"])].dropna(subset=["I/E"])   # keep only valid I or E
+    df = df[df["I/E"].isin(["I", "E"])].dropna(subset=["I/E"])
     sns.set(style="whitegrid")
 
     plt.figure(figsize=(8, 6))
@@ -801,8 +841,8 @@ def plot_truth_violin_dichotomy_IE(df, plots_path, df_type):
         x="I/E",
         y="Truthfulness",
         order=["I", "E"],
-        palette="Set2",
         hue="I/E",
+        palette=[HUE_COLOUR["I"], HUE_COLOUR["E"]],
         inner="quartile"
     )
     leg = ax.get_legend()
@@ -814,20 +854,18 @@ def plot_truth_violin_dichotomy_IE(df, plots_path, df_type):
     plt.tight_layout()
 
     os.makedirs(plots_path, exist_ok=True)
-    fname = os.path.join(plots_path, f"truth_violin_IE.png")
+    fname = os.path.join(plots_path, "truth_violin_IE.png")
     plt.savefig(fname, dpi=300, bbox_inches="tight")
     plt.close()
+
 
 ### Plotting functions df_agents
 
 def plot_defection_rate_bar_dichotomy(df_agents: pd.DataFrame, plots_path, df_type) -> str:
     """
-    Bar-plots of mean defection rate for each MBTI dichotomy (I/E, N/S, T/F, J/P).
-
-    Saves   <plots_path>/defection_rate_by_dichotomy.png   and returns that filepath.
+    Bar plots of mean defection rate for each MBTI dichotomy (I/E, N/S, T/F, J/P).
+    Saves <plots_path>/defection_rate_by_dichotomy.png and returns the filepath.
     """
-
-    # 1. row-level defection rate -------------------------------------------------------
     def list_to_rate(actions):
         if isinstance(actions, str):
             actions = ast.literal_eval(actions)
@@ -836,19 +874,14 @@ def plot_defection_rate_bar_dichotomy(df_agents: pd.DataFrame, plots_path, df_ty
     df = df_agents.copy()
     df["defection_rate"] = df["Actions"].apply(list_to_rate)
 
-    # 2. one mean per MBTI personality --------------------------------------------------
     group_cols = ["Personality", "I/E", "N/S", "T/F", "J/P"]
     mbti_means = (
         df.groupby(group_cols, as_index=False)["defection_rate"]
           .mean()
     )
 
-    # 3. plotting -----------------------------------------------------------------------
-    sns.set(style="whitegrid")
-    plt.rcParams.update({'font.size': 14})
-    plt.rcParams['figure.figsize'] = [8, 6]
-
-    fig, axes = plt.subplots(2, 2, sharey=True)
+    sns.set(style="whitegrid", context="talk")
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharey=True)
     axes = axes.flatten()
 
     dichotomies = [("I/E", ("I", "E")),
@@ -861,10 +894,11 @@ def plot_defection_rate_bar_dichotomy(df_agents: pd.DataFrame, plots_path, df_ty
             data=mbti_means,
             x=col, y="defection_rate",
             order=list(order),
-            hue=col,               # <-- satisfy “palette needs a hue”
-            palette="Set2",
+            hue=col,
+            hue_order=order,
+            palette=[HUE_COLOUR[o] for o in order],
             legend=False,
-            errorbar="sd",         # <-- modern replacement for ci="sd"
+            errorbar="sd",
             ax=ax,
         )
         ax.set_title(f"Defection rate by {col}")
@@ -872,12 +906,11 @@ def plot_defection_rate_bar_dichotomy(df_agents: pd.DataFrame, plots_path, df_ty
         ax.set_ylabel("Mean defect rate")
 
     fig.tight_layout()
-
-    # 4. save ---------------------------------------------------------------------------
     os.makedirs(plots_path, exist_ok=True)
     file_path = os.path.join(plots_path, "defection_rate_by_dichotomy.png")
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
+    return file_path
 
 
 def plot_defection_rate_bar_all(df_agents: pd.DataFrame, plots_path: str | os.PathLike, df_type) -> str:
@@ -889,45 +922,37 @@ def plot_defection_rate_bar_all(df_agents: pd.DataFrame, plots_path: str | os.Pa
     df = df_agents.copy()
     df["defection_rate"] = df["Actions"].apply(list_to_rate)
 
-    # ------------------------------------------------------------------ 2. one mean per MBTI code
     mbti_means = (
         df.groupby("Personality", as_index=False)["defection_rate"]
           .mean()
-          .sort_values("defection_rate", ascending=False)   # tallest bar first
+          .sort_values("defection_rate", ascending=False)
     )
 
-    # ------------------------------------------------------------------ 3. plottin
-
     fig, ax = plt.subplots()
-
-    hue_col = "Personality"     # satisfy seaborn’s palette requirement
-
     sns.barplot(
         data=mbti_means,
         x="Personality", y="defection_rate",
-        hue=hue_col,
+        hue="Personality",
         order=personality_order,
-        palette="Set2",
+        palette=PALETTE_BY_TYPE,
         legend=False,
-        errorbar="sd",              # seaborn ≥0.14
+        errorbar="sd",
         ax=ax,
     )
 
     ax.set_title("Mean defection rate by MBTI personality")
     ax.set_xlabel("")
     ax.set_ylabel("Mean defect rate")
-   # Option A – preferred
     ax.tick_params(axis="x", rotation=45)
     for lbl in ax.get_xticklabels():
         lbl.set_ha("right")
 
     fig.tight_layout()
-
-    # ------------------------------------------------------------------ 4. save
     os.makedirs(plots_path, exist_ok=True)
     file_path = os.path.join(plots_path, "defection_rate_all.png")
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
+    return file_path
 
 def plot_truth_strip_dichotomy(df_agents, plots_path, df_type):
     return
@@ -970,63 +995,41 @@ def plot_truth_strip_dichotomy(df_agents, plots_path, df_type):
     plt.close(fig)
 
 def plot_truth_by_round(df_agents, plots_path, df_type):
-    # Prepare the data for plotting
     df_agents = df_agents.copy()
     df_agents['Round'] = df_agents['CumulativeScore'].apply(lambda x: list(range(len(x))))
     df_agents['TruthfulByRound'] = df_agents.apply(lambda row: list(zip(row['Round'], row['Truthful'])), axis=1)
 
-    # Explode the data to have one row per round
     df_exploded = df_agents.explode('TruthfulByRound')
     df_exploded['Round'] = df_exploded['TruthfulByRound'].apply(lambda x: x[0] if isinstance(x, tuple) else None)
     df_exploded['Truthful'] = df_exploded['TruthfulByRound'].apply(lambda x: x[1] if isinstance(x, tuple) else None)
-
-    # Filter out rows with missing values
     df_exploded = df_exploded.dropna(subset=['Round', 'Truthful'])
-
-    # Convert Round to integer for proper sorting
     df_exploded['Round'] = df_exploded['Round'].astype(int)
 
-    # Plot average truthfulness by round for each dichotomy
-    sns.set(style="whitegrid")
-    sns.set_context("talk")
-    sns.set_palette("husl")
+    sns.set(style="whitegrid", context="talk")
     fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
-    sns.lineplot(data=df_exploded, x='Round', y='Truthful', hue='I/E', ax=axs[0, 0])
-    axs[0, 0].set_title('Average Truthfulness by Round - I/E')
+    dichotomies = [("I/E", ["I", "E"]),
+                   ("N/S", ["N", "S"]),
+                   ("T/F", ["T", "F"]),
+                   ("J/P", ["J", "P"])]
 
-    sns.lineplot(data=df_exploded, x='Round', y='Truthful', hue='N/S', ax=axs[0, 1])
-    axs[0, 1].set_title('Average Truthfulness by Round - N/S')
-
-    sns.lineplot(data=df_exploded, x='Round', y='Truthful', hue='T/F', ax=axs[1, 0])
-    axs[1, 0].set_title('Average Truthfulness by Round - T/F')
-
-    sns.lineplot(data=df_exploded, x='Round', y='Truthful', hue='J/P', ax=axs[1, 1])
-    axs[1, 1].set_title('Average Truthfulness by Round - J/P')
+    for ax, (dich, levels) in zip(axs.flat, dichotomies):
+        sns.lineplot(
+            data=df_exploded,
+            x='Round', y='Truthful',
+            hue=dich,
+            hue_order=levels,
+            palette=[HUE_COLOUR[level] for level in levels],
+            ax=ax
+        )
+        ax.set_title(f'Average Truthfulness by Round - {dich}')
+        ax.set_ylabel("Average Truthfulness")
+        ax.set_xlabel("Round")
 
     plt.tight_layout()
-    plt.savefig(plots_path + "truthfulness_by_round.png", dpi=300)
+    os.makedirs(plots_path, exist_ok=True)
+    plt.savefig(os.path.join(plots_path, "truthfulness_by_round.png"), dpi=300)
     plt.close(fig)
-
-# ── colour + label maps ────────────────────────────────────────────────────
-PALETTE_BY_PAIR = {
-    "I/E": sns.color_palette("Blues",   2),
-    "N/S": sns.color_palette("Greens",  2),
-    "T/F": sns.color_palette("Oranges", 2),
-    "J/P": sns.color_palette("Purples", 2),
-}
-HUE_COLOUR = {
-    "I": PALETTE_BY_PAIR["I/E"][0], "E": PALETTE_BY_PAIR["I/E"][1],
-    "N": PALETTE_BY_PAIR["N/S"][0], "S": PALETTE_BY_PAIR["N/S"][1],
-    "T": PALETTE_BY_PAIR["T/F"][0], "F": PALETTE_BY_PAIR["T/F"][1],
-    "J": PALETTE_BY_PAIR["J/P"][0], "P": PALETTE_BY_PAIR["J/P"][1],
-}
-LABEL_FULL = {
-    "I": "Introversion", "E": "Extraversion",
-    "N": "Intuition",    "S": "Sensing",
-    "T": "Thinking",     "F": "Feeling",
-    "J": "Judging",      "P": "Perceiving",
-}
 
 # ── helper to build ONE legend, now ABOVE the whole figure ────────────────
 def _legend_above(fig, title="", ncol=8):
@@ -1210,39 +1213,43 @@ def plot_mean_truthfulness_by_df_type(df_agents, plots_path, df_type):
     plt.close()
     
 def plot_strategy_switches_by_df_type_TF(df_agents, plots_path, df_type):
-    df_agents = df_agents.copy()
     if df_type == "pd":
         return
+
+    df_agents = df_agents.copy()
     slice_by = "Model" if df_type == "model" else "GameName"
-    
+
+    os.makedirs(plots_path, exist_ok=True)
+
     for slice_name in df_agents[slice_by].unique():
         slice_df = df_agents[df_agents[slice_by] == slice_name]
         t_switches = slice_df.loc[slice_df['T/F'] == 'T', 'Switches']
         f_switches = slice_df.loc[slice_df['T/F'] == 'F', 'Switches']
-        
+
         t_counts = t_switches.value_counts().reindex(range(7), fill_value=0)
         f_counts = f_switches.value_counts().reindex(range(7), fill_value=0)
-        
-        plt.figure(figsize=(7,5))
+
+        plt.figure(figsize=(7, 5))
         sns.barplot(x=t_counts.index, y=t_counts.values,
-                color='steelblue', label='T')
+                    color=HUE_COLOUR["T"], label='T')
         sns.barplot(x=f_counts.index, y=-f_counts.values,
-                color='salmon', label='F')
-        
+                    color=HUE_COLOUR["F"], label='F')
+
         max_y = max(t_counts.values.max(), f_counts.values.max())
         plt.ylim(-max_y - 2, max_y + 2)
         plt.axhline(0, color='black', linewidth=0.8)
 
         plt.xlabel('Number of Strategy Switches')
         plt.ylabel('Frequency')
-        #plt.title(f"Strategy switches for T/F personalities : {slice_name}")
-        plt.legend(title='Dichotomy', loc='upper right')
+        plt.legend(title='T/F', loc='upper right')
         plt.tight_layout()
-        plt.savefig(os.path.join(plots_path, f'strategy_switches_{slice_name}_TF.png'), dpi=300)
+
+        filename = f'strategy_switches_{slice_name}_TF.png'
+        plt.savefig(os.path.join(plots_path, filename), dpi=300)
         plt.close()
+
         
 def plot_who_lied_first_count_all(df_agents, plots_path, df_type):
-    #TODO:adapt to free will
     df_agents = df_agents.copy()
     max_possible_lies = df_agents["LiedFirst"].sum()
     # compute fraction of episodes where each agent lied first
@@ -1259,8 +1266,9 @@ def plot_who_lied_first_count_all(df_agents, plots_path, df_type):
         data=summary,
         x="Personality", y="LiedFirst",
         hue="Personality",
-        palette="tab20",
-        ax=ax
+        palette=PALETTE_BY_TYPE,
+        ax=ax,
+        order=personality_order,
     )
     ax.set_ylabel("Proportion Lied First")
     ax.tick_params(axis='x', rotation=45)
@@ -1275,63 +1283,104 @@ def plot_who_lied_first_count_all(df_agents, plots_path, df_type):
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
     
-def plot_who_lied_first_proportion_dichotomy(df_agents, plots_path, df_type):
-    #TODO
-    pass
-    
+def plot_who_lied_first_proportion_dichotomy(df_agents, plots_path, df_type=None):
+    """
+    Generate a 2x2 grid of bar plots showing the proportion of agents who lied first,
+    grouped by MBTI dichotomies (I/E, N/S, T/F, J/P), using consistent MBTI color coding.
+    """
+    df = df_agents.copy()
+    dichotomy_pairs = [("I/E", ["I", "E"]),
+                       ("N/S", ["N", "S"]),
+                       ("T/F", ["T", "F"]),
+                       ("J/P", ["J", "P"])]
+
+    os.makedirs(plots_path, exist_ok=True)
+
+    sns.set(style="whitegrid", context="talk")
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    axes = axes.flatten()
+
+    for i, (dim, hues) in enumerate(dichotomy_pairs):
+        if dim not in df.columns:
+            continue
+
+        summary = (
+            df.groupby(dim, as_index=False)["LiedFirst"]
+              .mean()
+              .rename(columns={"LiedFirst": "ProportionLiedFirst"})
+        )
+
+        sns.barplot(
+            data=summary,
+            x=dim,
+            y="ProportionLiedFirst",
+            hue=dim,
+            hue_order=hues,
+            palette=[HUE_COLOUR[h] for h in hues],
+            ax=axes[i],
+        )
+
+        axes[i].set_ylim(0, 1)
+        axes[i].set_ylabel("Proportion Lied First")
+        axes[i].set_title(f"Lied First by {dim}")
+        if axes[i].get_legend():
+            axes[i].legend_.remove()
+
+    plt.tight_layout()
+    file_path = os.path.join(plots_path, "lied_first_by_dichotomy_grid.png")
+    fig.savefig(file_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
 
 def plot_who_lied_first_IE_TF(df_agents, plots_path, df_type):
-    #TODO: adapt o free will
     df_agents = df_agents.copy()
-    
-    # compute fraction of episodes where each agent lied first
-    summary = (
+
+    # I/E plot
+    summary_ie = (
         df_agents
         .groupby("I/E", as_index=False)["LiedFirst"]
         .sum()
     )
 
-    # plot
-    sns.set(style="whitegrid")
     fig, ax = plt.subplots()
     sns.barplot(
-        data=summary,
+        data=summary_ie,
         x="I/E", y="LiedFirst",
         hue="I/E",
-        palette=["#4c72b0", "#dd8452"],
+        hue_order=["I", "E"],
+        palette=[HUE_COLOUR["I"], HUE_COLOUR["E"]],
         ax=ax
     )
     ax.set_ylabel("Count Lied First")
-    ax.tick_params(axis='x')
-    # save
+    if ax.get_legend():
+        ax.get_legend().remove()
     os.makedirs(plots_path, exist_ok=True)
     file_path = os.path.join(plots_path, "who_lied_first_IE.png")
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    
-    #now TF
-    # now TF
+
+    # T/F plot
     summary_tf = (
         df_agents
         .groupby("T/F", as_index=False)["LiedFirst"]
         .sum()
     )
 
-    sns.set(style="whitegrid")
     fig, ax = plt.subplots()
     sns.barplot(
         data=summary_tf,
         x="T/F", y="LiedFirst",
         hue="T/F",
-        palette=["#4c72b0", "#dd8452"],
+        hue_order=["T", "F"],
+        palette=[HUE_COLOUR["T"], HUE_COLOUR["F"]],
         ax=ax
     )
     ax.set_ylabel("Count Lied First")
-
-    os.makedirs(plots_path, exist_ok=True)
+    if ax.get_legend():
+        ax.get_legend().remove()
     file_path = os.path.join(plots_path, "who_lied_first_TF.png")
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
+
     
 #--------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1371,7 +1420,8 @@ def PD_plots():
         get_truthfulness_dichos,
         plot_truth_by_round,
         get_liedfirst_pvalues,
-        plot_who_lied_first,
+        plot_who_lied_first_count_all,
+        plot_who_lied_first_proportion_dichotomy,
         plot_who_lied_first_IE_TF,
         get_strategy_switch_pvalues,
     ]
@@ -1408,7 +1458,8 @@ def model_plots():
         plot_strategy_switches_by_df_type_TF,
         get_strategy_switch_pvalues,
         get_liedfirst_pvalues,
-        plot_who_lied_first,
+        plot_who_lied_first_count_all,
+        plot_who_lied_first_proportion_dichotomy,
         plot_who_lied_first_IE_TF,
     ]
     # Run the plotting functions
@@ -1436,7 +1487,8 @@ def game_plots():
         plot_strategy_switches_by_df_type_TF,
         get_strategy_switch_pvalues,
         get_liedfirst_pvalues,
-        plot_who_lied_first,
+        plot_who_lied_first_count_all,
+        plot_who_lied_first_proportion_dichotomy,
         plot_who_lied_first_IE_TF,
     ]
     plot_from_list(df_agents_og, plots_path, df_agent_functions, df_type)
