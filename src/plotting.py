@@ -955,7 +955,6 @@ def plot_defection_rate_bar_all(df_agents: pd.DataFrame, plots_path: str | os.Pa
     return file_path
 
 def plot_truth_strip_dichotomy(df_agents, plots_path, df_type):
-    return
     from matplotlib.lines import Line2D
     fig, axs = plt.subplots(2, 2, figsize=(13, 7))
 
@@ -967,7 +966,7 @@ def plot_truth_strip_dichotomy(df_agents, plots_path, df_type):
     # Re-group
     df_grouped_game = df_agents.groupby(
         ['GameName', 'Personality', 'I/E', 'N/S', 'T/F', 'J/P']
-    )['Truthfullness'].mean().reset_index()
+    )['Truthfulness'].mean().reset_index()
 
     dichotomies = ['I/E', 'N/S', 'T/F', 'J/P']
     axes = axs.flatten()
@@ -975,7 +974,7 @@ def plot_truth_strip_dichotomy(df_agents, plots_path, df_type):
     # Plot without subplot legends
     for ax, col in zip(axes, dichotomies):
         sns.stripplot(
-            x=col, y='Truthfullness', hue='Personality', data=df_grouped_game,
+            x=col, y='Truthfulness', hue='Personality', data=df_grouped_game,
             ax=ax, palette=palette, jitter=True, dodge=False, size=10, legend=False
         )
         ax.set_title(f'Truthfulness by {col}')
@@ -987,12 +986,20 @@ def plot_truth_strip_dichotomy(df_agents, plots_path, df_type):
         for p in personalities
     ]
 
-    fig.legend(handles=handles, title='Personality',
-               loc='center left', bbox_to_anchor=(1.01, 0.5), frameon=True)
+    fig.legend(
+        handles=handles,
+        title='Personality',
+        loc='center left',
+        bbox_to_anchor=(0.85, 0.5),
+        frameon=True
+    )
 
-    plt.tight_layout(rect=[0, 0, 1, 1])  # Leave space for legend
-    plt.savefig(os.path.join(plots_path, 'truth_strip_dichotomy.png'), dpi=300)
+    # Leave space on the right for the legend
+    plt.tight_layout(rect=[0, 0, 0.85, 1])  # Shrinks plotting area to 85% width
+
+    plt.savefig(os.path.join(plots_path, 'truth_strip_dichotomy.png'), dpi=300, bbox_inches='tight')
     plt.close(fig)
+
 
 def plot_truth_by_round(df_agents, plots_path, df_type):
     df_agents = df_agents.copy()
@@ -1429,7 +1436,6 @@ def plot_who_lied_first_IE_TF(df_agents, plots_path, df_type):
     fig.savefig(file_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
-    
 #--------------------------------------------------------------------------------------------------------------------------------------
 
 def plot_from_list(df, plots_path, plot_functions, df_type=None):
@@ -1439,6 +1445,16 @@ def plot_from_list(df, plots_path, plot_functions, df_type=None):
         except Exception as e:
             print(f"Error in {func.__name__}: {e}")
             continue
+        
+def stripplot_test():
+    df_type = 'model'
+    df, plots_path = import_df_and_plot_path(df_type)
+    df_agents_og = import_df_agents(df)
+    df_agents = df_agents_og.copy()
+    df_agent_functions = [plot_truth_strip_dichotomy]
+    # Run the plotting functions
+    plot_from_list(df_agents, plots_path, df_agent_functions, df_type)
+        
 #run whats runnable
 def PD_plots():
     df_type = 'pd'
@@ -1554,8 +1570,9 @@ if __name__ == '__main__':
     # Set the figure size for all plots
     plt.rcParams['figure.figsize'] = [10, 6]
 
-    PD_plots()
-    model_plots()
-    game_plots()
+    stripplot_test()
+    #PD_plots()
+    #model_plots()
+    #game_plots()
 
     
