@@ -1212,6 +1212,54 @@ def plot_mean_truthfulness_by_df_type(df_agents, plots_path, df_type):
     plt.savefig(os.path.join(plots_path, f'truthfulness_mean_all_{df_type}.png'), bbox_inches='tight')
     plt.close()
     
+def plot_strategy_switches_dichotomy(df_agents, plots_path, df_type=None):
+    """
+    Generate a 2x2 grid of bar plots showing the mean number of strategy switches,
+    grouped by MBTI dichotomies (I/E, N/S, T/F, J/P), using consistent MBTI color coding.
+    """
+    df = df_agents.copy()
+    dichotomy_pairs = [("I/E", ["I", "E"]),
+                       ("N/S", ["N", "S"]),
+                       ("T/F", ["T", "F"]),
+                       ("J/P", ["J", "P"])]
+
+    os.makedirs(plots_path, exist_ok=True)
+
+    sns.set(style="whitegrid", context="talk")
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    axes = axes.flatten()
+
+    for i, (dim, hues) in enumerate(dichotomy_pairs):
+        if dim not in df.columns:
+            continue
+
+        summary = (
+            df.groupby(dim, as_index=False)["Switches"]
+              .mean()
+              .rename(columns={"Switches": "MeanSwitches"})
+        )
+
+        sns.barplot(
+            data=summary,
+            x=dim,
+            y="MeanSwitches",
+            hue=dim,
+            hue_order=hues,
+            palette=[HUE_COLOUR[h] for h in hues],
+            ax=axes[i],
+        )
+
+        axes[i].set_ylabel("Mean Strategy Switches")
+        axes[i].set_title(f"Strategy Switches by {dim}")
+        if axes[i].get_legend():
+            axes[i].legend_.remove()
+
+    plt.tight_layout()
+    file_path = os.path.join(plots_path, "strategy_switches_by_dichotomy_grid.png")
+    fig.savefig(file_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    
 def plot_strategy_switches_by_df_type_TF(df_agents, plots_path, df_type):
     if df_type == "pd":
         return
@@ -1455,6 +1503,7 @@ def model_plots():
         plot_truthfulness_by_df_type_IE,
         plot_truthfulness_violin_by_df_typ,
         plot_mean_truthfulness_by_df_type,
+        plot_strategy_switches_dichotomy,
         plot_strategy_switches_by_df_type_TF,
         get_strategy_switch_pvalues,
         get_liedfirst_pvalues,
@@ -1484,6 +1533,7 @@ def game_plots():
         plot_truthfulness_by_df_type_IE,
         plot_truthfulness_violin_by_df_typ,
         plot_mean_truthfulness_by_df_type,
+        plot_strategy_switches_dichotomy,
         plot_strategy_switches_by_df_type_TF,
         get_strategy_switch_pvalues,
         get_liedfirst_pvalues,
