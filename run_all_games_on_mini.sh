@@ -1,6 +1,6 @@
 #!/bin/bash
 
-games=("hawk_dove") #"stag_hunt" "chicken" "prisoners_dilemma" "generic"  "deadlock" "battle_of_sexes)
+games=("hawk_dove" "stag_hunt" "chicken" "prisoners_dilemma" "generic" "coordination")
 personas=("NONE" "ISTJ" "ISFJ" "INFJ" "INTJ" "ISTP" "ISFP" "INFP" "INTP" "ESTP" "ESFP" "ENFP" "ENTP" "ESTJ" "ESFJ" "ENFJ" "ENTJ" "ALTRUISTIC" "SELFISH")
 nr_of_rounds=7
 model_id_1="gpt-4o-mini-2024-07-18"

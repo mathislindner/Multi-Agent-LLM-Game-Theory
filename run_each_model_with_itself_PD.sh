@@ -2,11 +2,8 @@
 
 personas=("NONE" "ISTJ" "ISFJ" "INFJ" "INTJ" "ISTP" "ISFP" "INFP" "INTP" "ESTP" "ESFP" "ENFP" "ENTP" "ESTJ" "ESFJ" "ENFJ" "ENTJ" "ALTRUISTIC" "SELFISH")
 nr_of_rounds=7
-model_providers=("deepseek" "anthropic" "google_vertexai" "openai") #"anthropic" "google_vertexai"
-model_providers=("google_vertexai" "google_vertexai" "google_vertexai" "openai" "openai")
-model_ids=("deepseek-chat" "claude-3-5-haiku-20241022" "gemini-2.0-flash-lite" "gpt-4o-mini-2024-07-18") # "claude-3-5-sonnet-20241022" "gemini-2.0-flash"
-model_ids=("gemini-1.5-flash-002" "gemini-2.0-flash" "gemini-2.5-pro-exp-03-25" "gpt-4.1-mini-2025-04-14" "gpt-3.5-turbo")
-
+model_providers=("deepseek" "anthropic" "google_vertexai" "openai" "google_vertexai" "google_vertexai" "google_vertexai" "openai" "openai")
+model_ids=("deepseek-chat" "claude-3-5-haiku-20241022" "gemini-2.0-flash-lite" "gpt-4o-mini-2024-07-18" "gemini-1.5-flash-002" "gemini-2.0-flash" "gemini-2.5-pro-exp-03-25" "gpt-4.1-mini-2025-04-14" "gpt-3.5-turbo")
 
 game_name="prisoners_dilemma"
 
@@ -17,7 +14,7 @@ for m in "${!model_ids[@]}"; do
     model_id="${model_ids[$m]}"
     provider="${model_providers[$m]}"
     for i in "${!personas[@]}"; do
-        for ((j=i; j<${#personas[@]}; j++)); do  # Start from i, allowing (A, A)
+        for ((j=i; j<${#personas[@]}; j++)); do
             agent_1="${personas[$i]}"
             agent_2="${personas[$j]}"
             current_iteration=$((current_iteration + 1))
