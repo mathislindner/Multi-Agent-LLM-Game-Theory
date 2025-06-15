@@ -6,9 +6,7 @@ import pandas as pd
 from langchain_community.callbacks.openai_info import OpenAICallbackHandler
 
 from src.games_structures.base_game import BaseGameStructure, GameState
-from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt, get_agent_annotated_prompt, AnnotatedPrompt, merge_following_system_prompts
-
-from langchain_core.messages import HumanMessage
+from src.node_helpers import load_game_structure_from_registry, get_answer_format, get_question_prompt, get_agent_annotated_prompt, AnnotatedPrompt
 
 def send_prompts_node(prompt_type : Literal["message", "action"], GameStructure: BaseGameStructure) -> Callable:
     '''Get the function to send the prompts to the agents. The function is used in the graph to send the prompts to the agents.
@@ -53,7 +51,6 @@ def invoke_from_prompt_state_node(models, GameStructure) -> Callable:
             pass
 
         prompt = state.prompt
-        prompt = merge_following_system_prompts(prompt)
         agent_name = state.agent_name
         prompt_type = state.prompt_type
         model = models[agent_name]
@@ -173,9 +170,8 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
         "agent_2": get_model_by_id_and_provider(model_name_2, provider=model_provider_2)
     }
     
-    #intent_model = get_model_by_id_and_provider(model_name_1, provider=model_provider_1) #TODO Change back to openai
     intent_model = get_model_by_id_and_provider("gpt-4o-mini")
-    callback_handler = OpenAICallbackHandler() #TODO verify that this does not throw errors if we don t use openai
+    callback_handler = OpenAICallbackHandler()
     
     GameStructure = load_game_structure_from_registry(game_name) #game now includes the game prompt, the payoff matrix, the message response the action response formats
     
@@ -214,8 +210,6 @@ def run_n_rounds_w_com(model_provider_1: str, model_name_1: str, model_provider_
         )
     #compile and run
     compiled_graph = graph.compile()
-    #print mermaid
-    #print(compiled_graph.get_graph().draw_mermaid())
     #create initial state
     initial_state = GameState(
         personality_key_1=personality_key_1,

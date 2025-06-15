@@ -14,7 +14,6 @@ for k, v in os.environ.items():
     os.environ[k] = v
 #--------------------------------------------------------
 
-
 #-------------------------------------------------------
 def get_model_by_id_and_provider(model_id: str, provider: str = None):
     properties = {
