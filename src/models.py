@@ -2,7 +2,6 @@ import logging
 from dotenv import load_dotenv
 import os
 
-#TODO: use init chat model (can also infer provider from jsut model name)
 from langchain.chat_models import init_chat_model
 
 

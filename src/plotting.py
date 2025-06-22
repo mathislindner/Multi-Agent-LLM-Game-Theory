@@ -5,10 +5,9 @@ import seaborn as sns
 import os
 import numpy as np
 import pandas as pd
-from scipy import stats
-from scipy.stats import ttest_ind, mannwhitneyu, chi2_contingency, fisher_exact
+from scipy.stats import ttest_ind, chi2_contingency, fisher_exact
 
-from typing import Literal, Dict, Union, Optional
+from typing import Optional
 
 
 df_types = {
@@ -77,6 +76,7 @@ PALETTE_BY_TYPE = {
     "ISTJ": "#bcbd22", "ISFJ": "#17becf", "ESTJ": "#aec7e8", "ESFJ": "#ffbb78",
     "ISTP": "#98df8a", "ISFP": "#ff9896", "ESTP": "#c5b0d5", "ESFP": "#c49c94"
 }
+
 PALETTE_BY_TYPE.update({
     "NONE": (0.5, 0.5, 0.5),
     "ALTRUISTIC": (0.5, 0.5, 0.5),
@@ -1570,9 +1570,8 @@ if __name__ == '__main__':
     # Set the figure size for all plots
     plt.rcParams['figure.figsize'] = [10, 6]
 
-    stripplot_test()
-    #PD_plots()
-    #model_plots()
-    #game_plots()
+    PD_plots()
+    model_plots()
+    game_plots()
 
     
