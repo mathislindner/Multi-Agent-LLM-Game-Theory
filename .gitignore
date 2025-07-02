@@ -5,6 +5,7 @@ game_histories/
 data/models/*
 data/*/__pycache__/*
 sbatch_out/
-src/data/outputs/*
 *.pyc
 *.json
+src/data/outputs/plots/
+src/data/outputs/plots copy/
